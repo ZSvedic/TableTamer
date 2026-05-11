@@ -26,7 +26,9 @@ Questions:
     Headless testing probably needs a separate Scenario, because specific API calls are made.  
     CLI/web can probably be combined in one Scenario because Gherkin actions can be "user says/selects/saves STR" and "display STR" which can be executed in both CLI/web.  
 
-    A: 
+    A: Share when behavior is runner-agnostic; split when the surface flow differs.  
+    Tag the same Scenario with `@headless @cli @web` and use abstract steps (`When user requests "..."`, `Then table shows ...`); step definitions per tag map to API calls, stdin pipes, or browser actions.  
+    Split for surface-specific flows: `@headless`-only (schema validation, pagination edges), `@web`-only (dialogs, voice, drag), `@cli`-only (saved-flow runner).
 
  4. Q: Which is written first; the API spec or Gherkin files to test that API spec?  
     What is TDD's take on this?  
