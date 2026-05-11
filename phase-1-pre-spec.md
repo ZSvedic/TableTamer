@@ -80,14 +80,20 @@ Questions:
 
 10. Q: How will changes be propagates to UI (CLI and web)?  
 
-    A: Single trigger: **spec change → re-render**. Both surfaces subscribe to `(spec, rowStream)` from [data-model.md](data-model.md) and reprint/refetch atomically — no partial-cell diffs, renderer is a pure function of `(spec, rows)`.  
-    V1 CLI: after each successful patch, print status line + ASCII table (hand-rolled per Q2) + prompt; `llm-map` progress streams to stderr.  
-    V2 web: WebSocket (or long-poll) pushes the new spec; React + react-query refetches rows; TanStack Table virtualizes the page.  
-    Errors: validation/query failures roll back per Q9 and feed the error back to the LLM next turn — no optimistic updates in MVP.
+    A: Two triggers: **spec change → full re-render**, plus **chunk-complete → incremental update** for long-running `llm-map` ops so partial data is visible while the operation runs.  
+    V1 CLI: per chunk, stream a few sample row updates to stdout (`row 12: Country "USA" → "United States"`) — log-friendly, no terminal control codes per Q1; final full ASCII table reprinted on completion.  
+    V2 web: WebSocket pushes per-chunk deltas; React updates affected rows in place; in-flight rows show a skeleton state; TanStack Table virtualizes.  
+    Cancellation: Ctrl+C (CLI) / Stop button (web) → `AbortSignal` → **revert** the in-flight transformation per Q9 rollback semantics; the partial work just disappears from the spec (see [cancelation.feature](test-cases/cancelation.feature)).  
+    Errors: validation/query failures roll back and feed back to the LLM next turn — no optimistic updates in MVP.
 
-11. Should harness be written from scratch or forked from some simple exiting harness like  
+11. Q: Should harness be written from scratch or forked from some simple exiting harness like  
     [SWE-agent](https://github.com/swe-agent/swe-agent)?  
     What are the pros and cons of each?  
+
+    A: Write from scratch on top of the Vercel AI SDK (Q2). Vercel AI SDK already provides ~60% of a harness (`generateText`/`streamText` + tool use + provider abstraction + retries + streaming).  
+    TableTamer-specific 40% — REPL loop, `apply_spec_patch` tool, spec→query→row pipeline, ASCII renderer, chunked `llm-map` dispatcher returning `AsyncIterable<Update>` with `AbortSignal` plumbed through (live progress + cancel), error feedback loop — totals ~400–500 LOC for V1.  
+    **Why not fork SWE-agent:** Python (Q2 chose TS), bash+file-edit domain (TableTamer is JSON spec patches), accumulates full chat history (data-model.md:62 demands stateless ~1KB/turn), sandboxed code execution (not needed). Fork yields ~10% reusable, ~90% to strip — more work than from-scratch.  
+    **Stateless token-budget angle:** "no history accumulation" must be the default; writing from scratch makes that easy, while adapting an existing harness fights its accumulation model.
 
 12. Which tabular UI library should be used for the web app?
 
@@ -143,6 +149,7 @@ Reframe: the CLI is a REPL that prints a fresh view per command, not a TUI sprea
 | 8 | V2 | Validation / audit | flag missing/invalid fields; reject file |
 | 9 | V2 | Pivot / unpivot | reshape long ↔ wide |
 | 10 | V2 | Sort + top-N | order by column, keep first N or percentile |
+| ✱ | V1 | Cancellation (cross-cutting) | runtime/UX, not an ETL op — covers AbortSignal + revert semantics, see [cancelation.feature](test-cases/cancelation.feature) |
 
 **V1 rationale:** the three V1 picks exercise the three distinct patch mechanisms (column-level cell mutation, row-level deletion, spec view-filter AST) without requiring any spec-model extension beyond [data-model.md](data-model.md). V2 items each require extending the spec: schema change, second table, row collapse, format change, multi-output, or reshape.
 
