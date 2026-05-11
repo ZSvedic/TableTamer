@@ -95,7 +95,12 @@ Questions:
     **Why not fork SWE-agent:** Python (Q2 chose TS), bash+file-edit domain (TableTamer is JSON spec patches), accumulates full chat history (data-model.md:62 demands stateless ~1KB/turn), sandboxed code execution (not needed). Fork yields ~10% reusable, ~90% to strip — more work than from-scratch.  
     **Stateless token-budget angle:** "no history accumulation" must be the default; writing from scratch makes that easy, while adapting an existing harness fights its accumulation model.
 
-12. Which tabular UI library should be used for the web app?
+12. Q: Which tabular UI library should be used for the web app?  
+
+    A: **TanStack Table** — already validated in [research-links.md](research-links.md). Headless React lib with `@tanstack/react-virtual` for million-row virtualization, MIT licensed, no paid tiers, type-safe `ColumnDef[]` aligned with the Q2 TypeScript stack.  
+    **Compatibility with Q8/Q9/Q10:** spec `columns[]` maps 1:1 to `ColumnDef[]`; patches mutate spec in React state (no imperative API needed); chunk updates trigger per-cell React state changes (virtualizer re-renders only visible affected rows); skeleton state via cell renderers reading row metadata; cancel/revert = state rollback → atomic re-render. All compatible — no design changes needed upstream.  
+    Why not alternatives: AG Grid is imperative and gates pivot/range-select behind Enterprise; MUI DataGrid couples to MUI styling and Premium tier; Glide is canvas-based (weaker a11y, harder devtools); plain `<table>` reinvents virtualization.  
+    V2 integration cost: ~100-LOC `<DataGrid spec={spec} rows={rows} />` component wiring `useReactTable` + `useVirtualizer` + cell renderers for skeleton/in-flight rendering.
 
 ## Answer details
 
