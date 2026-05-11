@@ -5,6 +5,9 @@
   "workspaces": [
     "packages/*"
   ],
+  "scripts": {
+    "test:red": "bun x cucumber-js --profile headless ; bun x cucumber-js --profile cli"
+  },
   "devDependencies": {
     "@cucumber/cucumber": "^12.8.2",
     "@tabletamer/cli": "workspace:*",
