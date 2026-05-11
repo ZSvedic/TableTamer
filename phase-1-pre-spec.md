@@ -65,7 +65,7 @@ Questions:
  8. Q: Which data model should be used, that can be reused between headless/CLI/web?  
 
     A: Adopt [data-model.md](data-model.md) Spec + Patches as wire model; extend with `transformations: Transformation[]` — an ordered list replayed from the immutable source.  
-    Verbs: `filter` / `mutate` / `select` / `sort` / `group` / `join`, each carrying an `Expr = { sql } | { llm; model? }` union, so any verb runs deterministically (DuckDB SQL) or via batched LLM calls.  
+    Verbs: `filter` / `mutate` / `select` / `sort` / `group` / `join`, each carrying an `Expr` union — V1: `{ js } | { llm; model? }` (eval'd via `new Function`); V2: adds `{ sql }` evaluated by DuckDB. See Q13.  
     V1 subset: `filter` + `mutate` (both modes) + `select` + `sort` (sql only); `group` and `join` deferred to V2.  
     Runtime: pure verbs evaluate immediately; `{llm: ...}` exprs are chunked, parallel-called, then cached by `(input cells + prompt + model)` — caching itself is V2.  
     TypeScript types live in a shared `core/` package; transport varies (in-process for V1 CLI/headless, HTTP/JSON for V2 web).
@@ -101,6 +101,30 @@ Questions:
     **Compatibility with Q8/Q9/Q10:** spec `columns[]` maps 1:1 to `ColumnDef[]`; patches mutate spec in React state (no imperative API needed); chunk updates trigger per-cell React state changes (virtualizer re-renders only visible affected rows); skeleton state via cell renderers reading row metadata; cancel/revert = state rollback → atomic re-render. All compatible — no design changes needed upstream.  
     Why not alternatives: AG Grid is imperative and gates pivot/range-select behind Enterprise; MUI DataGrid couples to MUI styling and Premium tier; Glide is canvas-based (weaker a11y, harder devtools); plain `<table>` reinvents virtualization.  
     V2 integration cost: ~100-LOC `<DataGrid spec={spec} rows={rows} />` component wiring `useReactTable` + `useVirtualizer` + cell renderers for skeleton/in-flight rendering.
+
+13. Q: How is `Expr.sql` evaluated in V1, given Q2 deferred DuckDB to V2?  
+
+    A: V1 uses **JavaScript** (LLM emits arrow functions, `eval`-evaluated); V2 adds **DuckDB SQL** alongside. Security is acceptable for an internal MVP — no untrusted callers.  
+    **Expr union evolves:**  
+    V1: `Expr = { js: string } | { llm: string; model?: string }`  
+    V2: `Expr = { js: string } | { sql: string } | { llm: string; model?: string }` — V1 specs remain valid.  
+    **JS callback signature:** `(row, index, allRows) => result` matches `Array.filter()`; dedupe in V1 becomes a 1-line predicate: `(row, i, rows) => rows.findIndex(r => r.Email === row.Email) === i`.  
+    **Footprint:** zero new deps, ~50 LOC for the evaluator + system-prompt update telling the LLM to emit JS arrow functions.  
+    **V2 migration:** add a SQL eval path; existing V1 specs keep working since `{js}` is preserved.
+
+14. Q: What is the system prompt design — content and structure cached per turn?  
+
+    A: Cacheable prefix ~600 tokens via `cache_control: { type: 'ephemeral' }`, structured as: role + goal (~30) / `apply_spec_patch` tool description auto-generated from Zod schema (~150) / spec-format prose summary with Zod reference for full schema (~100) / transformation grammar + Expr union with V1 JS callback signature `(row, i, rows)` (~150) / 3 few-shot examples — JS filter, LLM mutate, JS dedupe (~150) / error-recovery rule (~20).  
+    Per-turn non-cached slots: current spec (~300) + user message (~30) + last error if any (~50) — total ~1 KB constant per turn, matching [data-model.md:62](data-model.md:62).  
+    Cache strategy: the entire ~600-token prefix is one cache breakpoint; only the per-turn slots vary across turns, so first turn pays full ingest and every subsequent turn hits the cache.  
+    Few-shot examples cover the three V1 patterns: filter via JS predicate, mutate via LLM prompt, dedupe via JS with `(row, i, rows)` signature — these three shapes generalize across all V1 use cases.
+
+15. Q: What is the `.flow` file format — JSON spec dump, patch sequence, or NL command log?  
+
+    A: V1 = Option A (JSON spec dump): `{ version, source, spec }`. Load spec → query data → write output; deterministic, sub-second, no LLM call on replay.  
+    Includes `source` as default (CLI `--input` overrides); extension `.flow` (already used in existing Gherkin), content is plain JSON.  
+    Brittleness on source-schema drift accepted for V1 — surface a clear error ("column `Country` not found; available: `country, name, ...`"); user re-edits spec or re-runs against original source.  
+    V2 evolves to Option D (hybrid): add NL command log alongside the spec; on query failure, LLM regenerates transformations from the original NL prompts against the actual source schema.
 
 ## Answer details
 

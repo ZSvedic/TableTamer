@@ -63,7 +63,8 @@ The Spec carries an ordered `transformations: Transformation[]` list that mutate
 
 ```ts
 type Expr =
-  | { sql: string }                              // DuckDB SQL expression
+  | { js:  string }                              // JS arrow function (V1)
+  | { sql: string }                              // DuckDB SQL expression (V2)
   | { llm: string; model?: string };             // prompt template using {Column} placeholders
 
 type Transformation =
@@ -75,8 +76,9 @@ type Transformation =
   | { kind: "join";   with: string; on: Expr; how?: "inner" | "left" };       // V2
 ```
 
-`Expr` lets any verb swap SQL for an LLM prompt:
-- `{sql: "..."}` → DuckDB (V2) or in-memory JS evaluator (V1).
+`Expr` lets any verb swap deterministic code for an LLM prompt:
+- `{js: "..."}` → `new Function()`-evaluated arrow function; signature `(row, index, allRows) => result`. **V1.**
+- `{sql: "..."}` → DuckDB. **V2.**
 - `{llm: "..."}` → batch rows, parallel-call the model, gather results; results cached by `(input cells + prompt + model)` (V2).
 
 **V1 subset:** `filter` + `mutate` (both modes) + `select` + `sort` (sql only). `group`/`join` are V2.
