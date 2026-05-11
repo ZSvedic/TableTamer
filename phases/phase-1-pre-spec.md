@@ -8,7 +8,7 @@ Questions:
 
     A: stdin/stdout REPL.  
     Cheap tokens, fast iteration, trivial to drive from Gherkin scenarios via piped input.  
-    Cell editing, scrolling, and column changes are not replicated as TUI interactions — they become spec patches driven by natural language, matching the `(spec, row_stream)` wire in [data-model.md](data-model.md).  
+    Cell editing, scrolling, and column changes are not replicated as TUI interactions — they become spec patches driven by natural language, matching the `(spec, row_stream)` wire in [data-model.md](../spec/data-model.md).  
     The transport is additive: a TTY or web renderer can be layered on the same protocol later.  
     See [Q1 details](#q1--stdinstdout-best-practices).  
     
@@ -36,35 +36,35 @@ Questions:
     A: Gherkin scenarios first, API spec derived from them, code last.  
     TDD/BDD/ATDD all converge on outside-in: capture user-visible behavior before committing to an API surface, because behavior is stable while APIs aren't.  
     `@headless` step definitions naturally become an executable API contract — writing them surfaces design questions concretely, so Gherkin and API spec co-evolve in tight cycles for that tier.  
-    For TableTamer, [data-model.md](data-model.md) is the draft API contract; next move is to enumerate top use cases as Gherkin (Q5–Q7) and derive HTTP endpoints from what `@headless` steps need to call.
+    For TableTamer, [data-model.md](../spec/data-model.md) is the draft API contract; next move is to enumerate top use cases as Gherkin (Q5–Q7) and derive HTTP endpoints from what `@headless` steps need to call.
 
  5. Q: What is a list of top 10 ETL use cases for individual users?  
     How to create test cases for them?  
     Should test cases cover just the main path or errors and edge cases also?  
     What is TDD's take on this?  
 
-    A: Top 10 listed in [Q5 details](#q5--top-10-etl-use-cases-and-test-strategy); each gets its own `.feature` file (use-case-prefixed) following the [datanorm.feature](test-cases/datanorm.feature) pattern — input fixture + golden output + `Background` + `Scenario Outline` + `@headless @cli @web` tags + surface-specific `Rule:` blocks.  
+    A: Top 10 listed in [Q5 details](#q5--top-10-etl-use-cases-and-test-strategy); each gets its own `.feature` file (use-case-prefixed) following the [datanorm.feature](../test-cases/datanorm.feature) pattern — input fixture + golden output + `Background` + `Scenario Outline` + `@headless @cli @web` tags + surface-specific `Rule:` blocks.  
     For MVP, Gherkin covers main paths + a handful of user-visible errors (malformed CSV, missing required column); exhaustive edge-case coverage belongs in unit tests, not acceptance tests.  
     TDD's test-pyramid view: acceptance tests at the top drive the outermost loop, unit tests at the base cover edges, every bug found earns a regression test — don't pre-write tests for hypothetical edges (YAGNI).
 
  6. Q: How many test cases for MVP is needed?  
 
-    A: V1 MVP = 3 use cases (datanorm + dedupe + filter), exercising the three distinct patch mechanisms (column-level cell mutation, row-level deletion, view-filter AST) — no spec extensions needed beyond [data-model.md](data-model.md).  
+    A: V1 MVP = 3 use cases (datanorm + dedupe + filter), exercising the three distinct patch mechanisms (column-level cell mutation, row-level deletion, view-filter AST) — no spec extensions needed beyond [data-model.md](../spec/data-model.md).  
     V2 MVP = remaining 7 use cases, each requiring a spec extension (schema change, second table, row collapse, format change, multi-output, reshape).  
-    Scenario count today: 15 test runs from 5 source scenarios in [datanorm.feature](test-cases/datanorm.feature); target ~30 across V1 once dedupe and filter scenarios are written.  
+    Scenario count today: 15 test runs from 5 source scenarios in [datanorm.feature](../test-cases/datanorm.feature); target ~30 across V1 once dedupe and filter scenarios are written.  
     TDD's take: write scenarios as you build, not upfront — each new scenario should expose a missing capability, not a hypothetical edge.
 
  7. Q: What are the requirements for an MVP?  
 
     A: Mostly covered by Q1–Q6; four V1-specific items consolidated here.  
-    **Acceptance criteria:** all `@headless` and `@cli` scenarios pass across [datanorm.feature](test-cases/datanorm.feature), [dedupe.feature](test-cases/dedupe.feature), [filter.feature](test-cases/filter.feature) — ~20 of the 29 test runs.  
-    **Web app deferred:** the 9 `@web` runs stay tagged for forward-compat but aren't expected to pass until V2-web (consistent with the CLI-first plan in [rationale.md](rationale.md)).  
+    **Acceptance criteria:** all `@headless` and `@cli` scenarios pass across [datanorm.feature](../test-cases/datanorm.feature), [dedupe.feature](../test-cases/dedupe.feature), [filter.feature](../test-cases/filter.feature) — ~20 of the 29 test runs.  
+    **Web app deferred:** the 9 `@web` runs stay tagged for forward-compat but aren't expected to pass until V2-web (consistent with the CLI-first plan in [rationale.md](../spec/rationale.md)).  
     **Out of scope for V1:** the 7 V2 use cases, web app, DuckDB, voice input, multi-user, cloud sync, telemetry.  
     **Two CLI modes:** interactive REPL (default) + `tabletamer execute <flow>` batch subcommand.
 
  8. Q: Which data model should be used, that can be reused between headless/CLI/web?  
 
-    A: Adopt [data-model.md](data-model.md) Spec + Patches as wire model; extend with `transformations: Transformation[]` — an ordered list replayed from the immutable source.  
+    A: Adopt [data-model.md](../spec/data-model.md) Spec + Patches as wire model; extend with `transformations: Transformation[]` — an ordered list replayed from the immutable source.  
     Verbs: `filter` / `mutate` / `select` / `sort` / `group` / `join`, each carrying an `Expr` union — V1: `{ js } | { llm; model? }` (eval'd via `new Function`); V2: adds `{ sql }` evaluated by DuckDB. See Q13.  
     V1 subset: `filter` + `mutate` (both modes) + `select` + `sort` (sql only); `group` and `join` deferred to V2.  
     Runtime: pure verbs evaluate immediately; `{llm: ...}` exprs are chunked, parallel-called, then cached by `(input cells + prompt + model)` — caching itself is V2.  
@@ -73,7 +73,7 @@ Questions:
  9. Q: How will changes be handled by an LLM?  
     JSON Patches, diffs, or search/replace tool?  
 
-    A: RFC 6902 JSON Patch (transformations array ops) + RFC 7396 JSON Merge Patch (shallow view-op edits), already specified in [data-model.md](data-model.md); validated via Zod against the Spec + Transformation union from Q8.  
+    A: RFC 6902 JSON Patch (transformations array ops) + RFC 7396 JSON Merge Patch (shallow view-op edits), already specified in [data-model.md](../spec/data-model.md); validated via Zod against the Spec + Transformation union from Q8.  
     LLM emits via a single Anthropic tool `apply_spec_patch(operations: JsonPatchOp[])` — atomic application, rollback + error fed to next turn on failure.  
     Why not diff/search-replace: structural ops are schema-validatable, type-safe, location-precise via JSON Pointer, and reversible (`undo = {op:"remove", path:"/transformations/-1"}`); text-based methods are brittle and can match the wrong location.  
     Common shapes: `{op:"add", path:"/transformations/-", value:<Transformation>}` for new ops; `{op:"remove", path:"/transformations/-1"}` for undo; `{op:"move", ...}` for reorder; merge patch for filter/sort/page tweaks.
@@ -83,7 +83,7 @@ Questions:
     A: Two triggers: **spec change → full re-render**, plus **chunk-complete → incremental update** for long-running `llm-map` ops so partial data is visible while the operation runs.  
     V1 CLI: per chunk, stream a few sample row updates to stdout (`row 12: Country "USA" → "United States"`) — log-friendly, no terminal control codes per Q1; final full ASCII table reprinted on completion.  
     V2 web: WebSocket pushes per-chunk deltas; React updates affected rows in place; in-flight rows show a skeleton state; TanStack Table virtualizes.  
-    Cancellation: Ctrl+C (CLI) / Stop button (web) → `AbortSignal` → **revert** the in-flight transformation per Q9 rollback semantics; the partial work just disappears from the spec (see [cancelation.feature](test-cases/cancelation.feature)).  
+    Cancellation: Ctrl+C (CLI) / Stop button (web) → `AbortSignal` → **revert** the in-flight transformation per Q9 rollback semantics; the partial work just disappears from the spec (see [cancelation.feature](../test-cases/cancelation.feature)).  
     Errors: validation/query failures roll back and feed back to the LLM next turn — no optimistic updates in MVP.
 
 11. Q: Should harness be written from scratch or forked from some simple exiting harness like  
@@ -97,7 +97,7 @@ Questions:
 
 12. Q: Which tabular UI library should be used for the web app?  
 
-    A: **TanStack Table** — already validated in [research-links.md](research-links.md). Headless React lib with `@tanstack/react-virtual` for million-row virtualization, MIT licensed, no paid tiers, type-safe `ColumnDef[]` aligned with the Q2 TypeScript stack.  
+    A: **TanStack Table** — already validated in [research-links.md](../spec/research-links.md). Headless React lib with `@tanstack/react-virtual` for million-row virtualization, MIT licensed, no paid tiers, type-safe `ColumnDef[]` aligned with the Q2 TypeScript stack.  
     **Compatibility with Q8/Q9/Q10:** spec `columns[]` maps 1:1 to `ColumnDef[]`; patches mutate spec in React state (no imperative API needed); chunk updates trigger per-cell React state changes (virtualizer re-renders only visible affected rows); skeleton state via cell renderers reading row metadata; cancel/revert = state rollback → atomic re-render. All compatible — no design changes needed upstream.  
     Why not alternatives: AG Grid is imperative and gates pivot/range-select behind Enterprise; MUI DataGrid couples to MUI styling and Premium tier; Glide is canvas-based (weaker a11y, harder devtools); plain `<table>` reinvents virtualization.  
     V2 integration cost: ~100-LOC `<DataGrid spec={spec} rows={rows} />` component wiring `useReactTable` + `useVirtualizer` + cell renderers for skeleton/in-flight rendering.
@@ -115,7 +115,7 @@ Questions:
 14. Q: What is the system prompt design — content and structure cached per turn?  
 
     A: Cacheable prefix ~600 tokens via `cache_control: { type: 'ephemeral' }`, structured as: role + goal (~30) / `apply_spec_patch` tool description auto-generated from Zod schema (~150) / spec-format prose summary with Zod reference for full schema (~100) / transformation grammar + Expr union with V1 JS callback signature `(row, i, rows)` (~150) / 3 few-shot examples — JS filter, LLM mutate, JS dedupe (~150) / error-recovery rule (~20).  
-    Per-turn non-cached slots: current spec (~300) + user message (~30) + last error if any (~50) — total ~1 KB constant per turn, matching [data-model.md:62](data-model.md:62).  
+    Per-turn non-cached slots: current spec (~300) + user message (~30) + last error if any (~50) — total ~1 KB constant per turn, matching [data-model.md:62](../spec/data-model.md:62).  
     Cache strategy: the entire ~600-token prefix is one cache breakpoint; only the per-turn slots vary across turns, so first turn pays full ingest and every subsequent turn hits the cache.  
     Few-shot examples cover the three V1 patterns: filter via JS predicate, mutate via LLM prompt, dedupe via JS with `(row, i, rows)` signature — these three shapes generalize across all V1 use cases.
 
@@ -133,7 +133,7 @@ Questions:
 - **Cell editing → describe, not click.** User says `"normalize phone numbers"`; LLM emits a spec patch. Rare point-edits: `set row 12 col Phone "+15551234"` → JSON Patch.
 - **Scrolling → paging commands.** `next` / `page 3` / `show 100` patches `page.offset`/`page.size`; runtime re-queries and reprints.
 - **Sticky header → reprint each turn.** No terminal control codes. Same pattern as `sqlite3`, `psql`, `duckdb`, `jq` REPLs.
-- **Column hide/reorder → spec patch**, already shown in [data-model.md](data-model.md).
+- **Column hide/reorder → spec patch**, already shown in [data-model.md](../spec/data-model.md).
 - **Output:** default ASCII table (`tabulate`/`rich.table`); `--format=jsonl|csv` for piping.
 
 Reframe: the CLI is a REPL that prints a fresh view per command, not a TUI spreadsheet. Interactions the LLM should absorb (cursor, scroll, in-cell edit) are deliberately not added — if they're needed, that's the signal to escalate to TTY or web, not bolt them onto stdin/stdout.
@@ -158,7 +158,7 @@ Reframe: the CLI is a REPL that prints a fresh view per command, not a TUI sprea
 - vs LangChain JS: heavier and pulls in agent abstractions we don't need.
 - vs hand-rolled `fetch`: reimplements streaming, retries, and tool-use schemas per provider.
 
-**Prompt caching:** Anthropic-native via `cache_control` markers passed through `providerOptions.anthropic`. System prompt + spec schema + tool defs become the cached prefix → per-turn cost stays near the [data-model.md:62](data-model.md:62) ~1 KB constant.
+**Prompt caching:** Anthropic-native via `cache_control` markers passed through `providerOptions.anthropic`. System prompt + spec schema + tool defs become the cached prefix → per-turn cost stays near the [data-model.md:62](../spec/data-model.md:62) ~1 KB constant.
 
 **Footprint** (verified via clean `npm install`): 5 direct, 11 total, 25 MB.
 
@@ -168,9 +168,9 @@ Reframe: the CLI is a REPL that prints a fresh view per command, not a TUI sprea
 
 | # | Tier | Use case | Notes |
 |---|---|---|---|
-| 1 | V1 | Field normalization | phone/date/country/currency formats — see [datanorm.feature](test-cases/datanorm.feature) |
-| 2 | V1 | Deduplication | drop duplicate rows by key column(s) — [dedupe.feature](test-cases/dedupe.feature) |
-| 3 | V1 | Filter / subset | extract rows matching a predicate — [filter.feature](test-cases/filter.feature) |
+| 1 | V1 | Field normalization | phone/date/country/currency formats — see [datanorm.feature](../test-cases/datanorm.feature) |
+| 2 | V1 | Deduplication | drop duplicate rows by key column(s) — [dedupe.feature](../test-cases/dedupe.feature) |
+| 3 | V1 | Filter / subset | extract rows matching a predicate — [filter.feature](../test-cases/filter.feature) |
 | 4 | V2 | Column split / merge | full-name → first+last; combine cols; parse addresses |
 | 5 | V2 | Lookup join | enrich rows from a second table |
 | 6 | V2 | Group + aggregate | sum/count/avg by category |
@@ -178,9 +178,9 @@ Reframe: the CLI is a REPL that prints a fresh view per command, not a TUI sprea
 | 8 | V2 | Validation / audit | flag missing/invalid fields; reject file |
 | 9 | V2 | Pivot / unpivot | reshape long ↔ wide |
 | 10 | V2 | Sort + top-N | order by column, keep first N or percentile |
-| ✱ | V1 | Cancellation (cross-cutting) | runtime/UX, not an ETL op — covers AbortSignal + revert semantics, see [cancelation.feature](test-cases/cancelation.feature) |
+| ✱ | V1 | Cancellation (cross-cutting) | runtime/UX, not an ETL op — covers AbortSignal + revert semantics, see [cancelation.feature](../test-cases/cancelation.feature) |
 
-**V1 rationale:** the three V1 picks exercise the three distinct patch mechanisms (column-level cell mutation, row-level deletion, spec view-filter AST) without requiring any spec-model extension beyond [data-model.md](data-model.md). V2 items each require extending the spec: schema change, second table, row collapse, format change, multi-output, or reshape.
+**V1 rationale:** the three V1 picks exercise the three distinct patch mechanisms (column-level cell mutation, row-level deletion, spec view-filter AST) without requiring any spec-model extension beyond [data-model.md](../spec/data-model.md). V2 items each require extending the spec: schema change, second table, row collapse, format change, multi-output, or reshape.
 
 **Out of scope for MVP:** PDF/HTML extraction, web scraping, geocoding, FX conversion (require external APIs or non-tabular input).
 

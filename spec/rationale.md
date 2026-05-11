@@ -51,4 +51,4 @@ Web UX is there for the development process; actual data is managed by a headles
 That allows any flow to run without the web app.
 
 ## Example use cases
-Use cases in the [Gherkin language](https://cucumber.io/docs/gherkin/reference) are in the [test-cases/](test-cases/) dir.
+Use cases in the [Gherkin language](https://cucumber.io/docs/gherkin/reference) are in the [test-cases/](../test-cases/) dir.
