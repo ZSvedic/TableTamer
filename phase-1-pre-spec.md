@@ -70,10 +70,20 @@ Questions:
     Runtime: pure verbs evaluate immediately; `{llm: ...}` exprs are chunked, parallel-called, then cached by `(input cells + prompt + model)` — caching itself is V2.  
     TypeScript types live in a shared `core/` package; transport varies (in-process for V1 CLI/headless, HTTP/JSON for V2 web).
 
- 9. How will changes be handled by an LLM?  
+ 9. Q: How will changes be handled by an LLM?  
     JSON Patches, diffs, or search/replace tool?  
 
-10. How will changes be propagates to UI (CLI and web)?  
+    A: RFC 6902 JSON Patch (transformations array ops) + RFC 7396 JSON Merge Patch (shallow view-op edits), already specified in [data-model.md](data-model.md); validated via Zod against the Spec + Transformation union from Q8.  
+    LLM emits via a single Anthropic tool `apply_spec_patch(operations: JsonPatchOp[])` — atomic application, rollback + error fed to next turn on failure.  
+    Why not diff/search-replace: structural ops are schema-validatable, type-safe, location-precise via JSON Pointer, and reversible (`undo = {op:"remove", path:"/transformations/-1"}`); text-based methods are brittle and can match the wrong location.  
+    Common shapes: `{op:"add", path:"/transformations/-", value:<Transformation>}` for new ops; `{op:"remove", path:"/transformations/-1"}` for undo; `{op:"move", ...}` for reorder; merge patch for filter/sort/page tweaks.
+
+10. Q: How will changes be propagates to UI (CLI and web)?  
+
+    A: Single trigger: **spec change → re-render**. Both surfaces subscribe to `(spec, rowStream)` from [data-model.md](data-model.md) and reprint/refetch atomically — no partial-cell diffs, renderer is a pure function of `(spec, rows)`.  
+    V1 CLI: after each successful patch, print status line + ASCII table (hand-rolled per Q2) + prompt; `llm-map` progress streams to stderr.  
+    V2 web: WebSocket (or long-poll) pushes the new spec; React + react-query refetches rows; TanStack Table virtualizes the page.  
+    Errors: validation/query failures roll back per Q9 and feed the error back to the LLM next turn — no optimistic updates in MVP.
 
 11. Should harness be written from scratch or forked from some simple exiting harness like  
     [SWE-agent](https://github.com/swe-agent/swe-agent)?  
