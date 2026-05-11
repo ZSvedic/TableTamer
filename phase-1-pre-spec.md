@@ -33,12 +33,19 @@ Questions:
  4. Q: Which is written first; the API spec or Gherkin files to test that API spec?  
     What is TDD's take on this?  
 
-    A: 
+    A: Gherkin scenarios first, API spec derived from them, code last.  
+    TDD/BDD/ATDD all converge on outside-in: capture user-visible behavior before committing to an API surface, because behavior is stable while APIs aren't.  
+    `@headless` step definitions naturally become an executable API contract — writing them surfaces design questions concretely, so Gherkin and API spec co-evolve in tight cycles for that tier.  
+    For TableTamer, [data-model.md](data-model.md) is the draft API contract; next move is to enumerate top use cases as Gherkin (Q5–Q7) and derive HTTP endpoints from what `@headless` steps need to call.
 
- 5. What is a list of top 10 ETL use cases for individual users?  
+ 5. Q: What is a list of top 10 ETL use cases for individual users?  
     How to create test cases for them?  
     Should test cases cover just the main path or errors and edge cases also?  
     What is TDD's take on this?  
+
+    A: Top 10 listed in [Q5 details](#q5--top-10-etl-use-cases-and-test-strategy); each gets its own `.feature` file (use-case-prefixed) following the [datanorm.feature](test-cases/datanorm.feature) pattern — input fixture + golden output + `Background` + `Scenario Outline` + `@headless @cli @web` tags + surface-specific `Rule:` blocks.  
+    For MVP, Gherkin covers main paths + a handful of user-visible errors (malformed CSV, missing required column); exhaustive edge-case coverage belongs in unit tests, not acceptance tests.  
+    TDD's test-pyramid view: acceptance tests at the top drive the outermost loop, unit tests at the base cover edges, every bug found earns a regression test — don't pre-write tests for hypothetical edges (YAGNI).
 
  6. How many test cases for MVP is needed?  
 
@@ -92,4 +99,32 @@ Reframe: the CLI is a REPL that prints a fresh view per command, not a TUI sprea
 **Prompt caching:** Anthropic-native via `cache_control` markers passed through `providerOptions.anthropic`. System prompt + spec schema + tool defs become the cached prefix → per-turn cost stays near the [data-model.md:62](data-model.md:62) ~1 KB constant.
 
 **Footprint** (verified via clean `npm install`): 5 direct, 11 total, 25 MB.
+
+### Q5 — Top 10 ETL use cases and test strategy
+
+**Top 10 (for individual users):**
+
+| # | Use case | Notes |
+|---|---|---|
+| 1 | Field normalization | phone/date/country/currency formats — see [datanorm.feature](test-cases/datanorm.feature) |
+| 2 | Deduplication | drop duplicate rows by key column(s) |
+| 3 | Filter / subset | extract rows matching a predicate |
+| 4 | Column split / merge | full-name → first+last; combine cols; parse addresses |
+| 5 | Lookup join | enrich rows from a second table |
+| 6 | Group + aggregate | sum/count/avg by category |
+| 7 | Format conversion | CSV ↔ JSONL ↔ Excel ↔ Parquet |
+| 8 | Validation / audit | flag missing/invalid fields; reject file |
+| 9 | Pivot / unpivot | reshape long ↔ wide |
+| 10 | Sort + top-N | order by column, keep first N or percentile |
+
+**Out of scope for MVP:** PDF/HTML extraction, web scraping, geocoding, FX conversion (require external APIs or non-tabular input).
+
+**Test pyramid:**
+
+| Layer | Where | Coverage |
+|---|---|---|
+| Acceptance | `.feature` files | Main paths + a few user-visible errors |
+| Integration | TS code | Spec validation, patch application, query execution |
+| Unit | TS code | Exhaustive edge cases (empty input, unicode, boundaries) |
+
 

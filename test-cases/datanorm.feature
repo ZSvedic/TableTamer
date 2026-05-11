@@ -3,8 +3,8 @@ Feature: Data normalization of customer records
   Rule: Apply transformations to a loaded CSV
 
     Background:
-      Given "customers-raw.csv" is loaded
-      And the golden output is "customers-normalized.jsonl"
+      Given "datanorm-input.csv" is loaded
+      And the golden output is "datanorm-expected.jsonl"
 
     @headless @cli @web
     Scenario Outline: Normalize <column>
@@ -20,8 +20,8 @@ Feature: Data normalization of customer records
     @headless @cli @web
     Scenario: Full normalization round-trip
       Given Phone, Country, and DOB are normalized
-      When user requests to export as "customers.jsonl"
-      Then "customers.jsonl" matches the golden output ignoring "Notes"
+      When user requests to export as "datanorm-output.jsonl"
+      Then "datanorm-output.jsonl" matches the golden output ignoring "Notes"
 
   Rule: Surface-specific UX flows
 
@@ -30,7 +30,7 @@ Feature: Data normalization of customer records
       Given the TableTamer web app
       When user says "Load CSV file"
       Then display Open File dialog
-      When user selects "customers-raw.csv"
+      When user selects "datanorm-input.csv"
       Then table displays the header and at least the first 5 rows
 
     @web
@@ -38,12 +38,12 @@ Feature: Data normalization of customer records
       Given Phone, Country, and DOB are normalized
       When user says "Save flow"
       Then display Save File dialog
-      When user saves as "customers-normalization.flow"
-      Then "customers-normalization.flow" contains normalization steps
+      When user saves as "datanorm.flow"
+      Then "datanorm.flow" contains normalization steps
 
     @cli
     Scenario: Execute saved flow from command line
-      Given "customers-normalization.flow" exists
-      And the golden output is "customers-normalized.jsonl"
-      When user runs "tabletamer execute customers-normalization.flow --input customers-raw.csv --output customers.jsonl"
-      Then "customers.jsonl" matches the golden output ignoring "Notes"
+      Given "datanorm.flow" exists
+      And the golden output is "datanorm-expected.jsonl"
+      When user runs "tabletamer execute datanorm.flow --input datanorm-input.csv --output customers.jsonl"
+      Then "datanorm-output.jsonl" matches the golden output ignoring "Notes"
