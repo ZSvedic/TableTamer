@@ -45,5 +45,5 @@ Feature: Data normalization of customer records
     Scenario: Execute saved flow from command line
       Given "datanorm.flow" exists
       And the golden output is "datanorm-expected.jsonl"
-      When user runs "tabletamer execute datanorm.flow --input datanorm-input.csv --output customers.jsonl"
+      When user runs "tabletamer execute datanorm.flow --input datanorm-input.csv --output datanorm-output.jsonl"
       Then "datanorm-output.jsonl" matches the golden output ignoring "Notes"

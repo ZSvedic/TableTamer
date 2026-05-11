@@ -1,1 +1,1 @@
-# Todo: 5. Lookup join — enrich rows from a second table
+# Todo (V2): 5. Lookup join — enrich rows from a second table

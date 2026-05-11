@@ -47,9 +47,20 @@ Questions:
     For MVP, Gherkin covers main paths + a handful of user-visible errors (malformed CSV, missing required column); exhaustive edge-case coverage belongs in unit tests, not acceptance tests.  
     TDD's test-pyramid view: acceptance tests at the top drive the outermost loop, unit tests at the base cover edges, every bug found earns a regression test — don't pre-write tests for hypothetical edges (YAGNI).
 
- 6. How many test cases for MVP is needed?  
+ 6. Q: How many test cases for MVP is needed?  
 
- 7. What are the requirements for an MVP?  
+    A: V1 MVP = 3 use cases (datanorm + dedupe + filter), exercising the three distinct patch mechanisms (column-level cell mutation, row-level deletion, view-filter AST) — no spec extensions needed beyond [data-model.md](data-model.md).  
+    V2 MVP = remaining 7 use cases, each requiring a spec extension (schema change, second table, row collapse, format change, multi-output, reshape).  
+    Scenario count today: 15 test runs from 5 source scenarios in [datanorm.feature](test-cases/datanorm.feature); target ~30 across V1 once dedupe and filter scenarios are written.  
+    TDD's take: write scenarios as you build, not upfront — each new scenario should expose a missing capability, not a hypothetical edge.
+
+ 7. Q: What are the requirements for an MVP?  
+
+    A: Mostly covered by Q1–Q6; four V1-specific items consolidated here.  
+    **Acceptance criteria:** all `@headless` and `@cli` scenarios pass across [datanorm.feature](test-cases/datanorm.feature), [dedupe.feature](test-cases/dedupe.feature), [filter.feature](test-cases/filter.feature) — ~20 of the 29 test runs.  
+    **Web app deferred:** the 9 `@web` runs stay tagged for forward-compat but aren't expected to pass until V2-web (consistent with the CLI-first plan in [rationale.md](rationale.md)).  
+    **Out of scope for V1:** the 7 V2 use cases, web app, DuckDB, voice input, multi-user, cloud sync, telemetry.  
+    **Two CLI modes:** interactive REPL (default) + `tabletamer execute <flow>` batch subcommand.
 
  8. Which data model should be used, that can be reused between headless/CLI/web?  
 
@@ -104,18 +115,20 @@ Reframe: the CLI is a REPL that prints a fresh view per command, not a TUI sprea
 
 **Top 10 (for individual users):**
 
-| # | Use case | Notes |
-|---|---|---|
-| 1 | Field normalization | phone/date/country/currency formats — see [datanorm.feature](test-cases/datanorm.feature) |
-| 2 | Deduplication | drop duplicate rows by key column(s) |
-| 3 | Filter / subset | extract rows matching a predicate |
-| 4 | Column split / merge | full-name → first+last; combine cols; parse addresses |
-| 5 | Lookup join | enrich rows from a second table |
-| 6 | Group + aggregate | sum/count/avg by category |
-| 7 | Format conversion | CSV ↔ JSONL ↔ Excel ↔ Parquet |
-| 8 | Validation / audit | flag missing/invalid fields; reject file |
-| 9 | Pivot / unpivot | reshape long ↔ wide |
-| 10 | Sort + top-N | order by column, keep first N or percentile |
+| # | Tier | Use case | Notes |
+|---|---|---|---|
+| 1 | V1 | Field normalization | phone/date/country/currency formats — see [datanorm.feature](test-cases/datanorm.feature) |
+| 2 | V1 | Deduplication | drop duplicate rows by key column(s) — [dedupe.feature](test-cases/dedupe.feature) |
+| 3 | V1 | Filter / subset | extract rows matching a predicate — [filter.feature](test-cases/filter.feature) |
+| 4 | V2 | Column split / merge | full-name → first+last; combine cols; parse addresses |
+| 5 | V2 | Lookup join | enrich rows from a second table |
+| 6 | V2 | Group + aggregate | sum/count/avg by category |
+| 7 | V2 | Format conversion | CSV ↔ JSONL ↔ Excel ↔ Parquet |
+| 8 | V2 | Validation / audit | flag missing/invalid fields; reject file |
+| 9 | V2 | Pivot / unpivot | reshape long ↔ wide |
+| 10 | V2 | Sort + top-N | order by column, keep first N or percentile |
+
+**V1 rationale:** the three V1 picks exercise the three distinct patch mechanisms (column-level cell mutation, row-level deletion, spec view-filter AST) without requiring any spec-model extension beyond [data-model.md](data-model.md). V2 items each require extending the spec: schema change, second table, row collapse, format change, multi-output, or reshape.
 
 **Out of scope for MVP:** PDF/HTML extraction, web scraping, geocoding, FX conversion (require external APIs or non-tabular input).
 

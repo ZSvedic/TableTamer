@@ -1,1 +1,1 @@
-# Todo: 6. Group + aggregate — sum/count/avg by category
+# Todo (V2): 6. Group + aggregate — sum/count/avg by category
