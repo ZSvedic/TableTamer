@@ -1,0 +1,11 @@
+{
+  "name": "tabletamer",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "devDependencies": {
+    "@cucumber/cucumber": "^12.8.2"
+  }
+}
