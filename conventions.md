@@ -24,7 +24,6 @@ Under `test-cases/`. Naming:
 Under `specs/`.
 
 ## Process
-
-- Outside-in TDD per Q4: Gherkin → step definitions → API spec → implementation → unit tests as edges surface.
-- Don't pre-write tests for hypothetical edges (Q5).
-- Compact decision records: ≤5 sentences in `A:` line; longer rationale in `## Answer details`.
+- Outside-in TDD: 
+  Gherkin → step definitions → API spec → implementation → unit tests as edges surface.
+- Don't pre-write tests for hypothetical edges.

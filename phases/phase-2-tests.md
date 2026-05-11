@@ -17,5 +17,7 @@ Prerequisites: Q1–Q15 in [phase-1-pre-spec.md](phase-1-pre-spec.md) and [conve
 5. **Verify red:** `bun x cucumber-js --tags "@headless or @cli"` should fail every V1 scenario with "module not found" or "function not defined" — not syntax/setup errors.
 
 ## Definition of done
-
-`bun install` clean · step defs compile · all V1 `@headless` + `@cli` scenarios fail with missing-symbol errors · shared steps used once across the three V1 features.
+- `bun install` clean.
+- Step defs compile. 
+- All V1 `@headless` + `@cli` scenarios fail with missing-symbol errors. 
+- Shared steps used once across the three V1 features.

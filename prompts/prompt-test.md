@@ -2,19 +2,13 @@ Read all documents in the project dir, especially [conventions.md](../convention
 
 Then execute the backlog in [phase-2-tests.md](../phases/phase-2-tests.md) to bring V1 Gherkin scenarios to the TDD red phase.
 
-Conventions (recap from conventions.md):
-- TypeScript everywhere.
-- Always use bun (`bun install`, `bun x cucumber-js`, `bun run`) — never npm or pnpm.
-- Monorepo via bun workspaces under `packages/`.
-- `minimumReleaseAge = 604800` in `bunfig.toml`.
-
 Process:
 - Execute backlog items in order (test runner → scaffolding → fixtures → step defs → red verification).
 - After each item, briefly summarize what was done and ask before continuing to the next.
 - Don't implement actual logic — phase 2 is about *failing tests* (red phase), not green.
 - Let TypeScript surface missing exports as input for phase-3 spec — don't pre-design the API.
 - For new dependencies, verify they exist and their footprint via `bun pm` or a clean test install.
-- Honor `minimumReleaseAge` — if a package was published less than 7 days ago, surface this and ask before overriding.
+- Honor `minimumReleaseAge`.
 
 Out of scope for this session:
 - `@web` step definitions (V2).
