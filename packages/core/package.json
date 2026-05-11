@@ -1,0 +1,17 @@
+{
+  "name": "@tabletamer/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "csv-parse": "^6.2.1",
+    "csv-stringify": "^6.7.0",
+    "fast-json-patch": "^3.1.1",
+    "zod": "^4.4.3"
+  }
+}
