@@ -62,7 +62,13 @@ Questions:
     **Out of scope for V1:** the 7 V2 use cases, web app, DuckDB, voice input, multi-user, cloud sync, telemetry.  
     **Two CLI modes:** interactive REPL (default) + `tabletamer execute <flow>` batch subcommand.
 
- 8. Which data model should be used, that can be reused between headless/CLI/web?  
+ 8. Q: Which data model should be used, that can be reused between headless/CLI/web?  
+
+    A: Adopt [data-model.md](data-model.md) Spec + Patches as wire model; extend with `transformations: Transformation[]` — an ordered list replayed from the immutable source.  
+    Verbs: `filter` / `mutate` / `select` / `sort` / `group` / `join`, each carrying an `Expr = { sql } | { llm; model? }` union, so any verb runs deterministically (DuckDB SQL) or via batched LLM calls.  
+    V1 subset: `filter` + `mutate` (both modes) + `select` + `sort` (sql only); `group` and `join` deferred to V2.  
+    Runtime: pure verbs evaluate immediately; `{llm: ...}` exprs are chunked, parallel-called, then cached by `(input cells + prompt + model)` — caching itself is V2.  
+    TypeScript types live in a shared `core/` package; transport varies (in-process for V1 CLI/headless, HTTP/JSON for V2 web).
 
  9. How will changes be handled by an LLM?  
     JSON Patches, diffs, or search/replace tool?  

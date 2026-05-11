@@ -57,6 +57,36 @@ For an operation merge-patch can't express — e.g. *"hide the customer column"*
 [{ "op": "remove", "path": "/columns/1" }]
 ```
 
+## Transformations
+
+The Spec carries an ordered `transformations: Transformation[]` list that mutates data before view ops (filter/sort/page/summary) run. The runtime replays them on the immutable source; "undo" = pop the last transformation.
+
+```ts
+type Expr =
+  | { sql: string }                              // DuckDB SQL expression
+  | { llm: string; model?: string };             // prompt template using {Column} placeholders
+
+type Transformation =
+  | { kind: "filter"; pred: Expr }
+  | { kind: "mutate"; columns: string | string[]; value: Expr }
+  | { kind: "select"; columns: string[] }
+  | { kind: "sort";   by: Array<{ key: Expr | string; dir: "asc"|"desc" }> }
+  | { kind: "group";  by: Array<Expr | string>; agg: Record<string, Expr> }   // V2
+  | { kind: "join";   with: string; on: Expr; how?: "inner" | "left" };       // V2
+```
+
+`Expr` lets any verb swap SQL for an LLM prompt:
+- `{sql: "..."}` → DuckDB (V2) or in-memory JS evaluator (V1).
+- `{llm: "..."}` → batch rows, parallel-call the model, gather results; results cached by `(input cells + prompt + model)` (V2).
+
+**V1 subset:** `filter` + `mutate` (both modes) + `select` + `sort` (sql only). `group`/`join` are V2.
+
+**Example — LLM-driven country canonicalization:**
+```json
+{ "kind": "mutate", "columns": "Country",
+  "value": { "llm": "Normalize country name '{Country}' to standard English." } }
+```
+
 ## Per-turn token budget
 
 | Slot | Tokens |
