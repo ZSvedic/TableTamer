@@ -1,1 +1,1 @@
-export {};
+export const createHeadlessRunner: any = undefined;

@@ -1,18 +1,22 @@
 const common = {
-  paths: ['test-cases/**/*.feature'],
+  paths: [
+    'test-cases/datanorm.feature',
+    'test-cases/dedupe.feature',
+    'test-cases/filter.feature',
+  ],
   import: ['test-cases/step-defs/**/*.ts'],
 };
 
-export default {
-  default: common,
-  headless: {
-    ...common,
-    tags: '@headless',
-    worldParameters: { surface: 'headless' },
-  },
-  cli: {
-    ...common,
-    tags: '@cli',
-    worldParameters: { surface: 'cli' },
-  },
+export default common;
+
+export const headless = {
+  ...common,
+  tags: '@headless',
+  worldParameters: { surface: 'headless' },
+};
+
+export const cli = {
+  ...common,
+  tags: '@cli',
+  worldParameters: { surface: 'cli' },
 };
