@@ -21,7 +21,7 @@ Under `test-cases/`. Naming:
 - `<usecase>.feature` — Gherkin scenarios
 
 ## Specs
-Under `specs/`.
+Under `spec/` — hub at [spec/spec.md](spec/spec.md), style rules in [spec/writing-style.md](spec/writing-style.md).
 
 ## Process
 - Outside-in TDD: 

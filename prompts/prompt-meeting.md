@@ -11,4 +11,4 @@ Then, let's have a meeting to decide on all points in the specified MD meeting d
 - If instructed, you can edit other spec docs. 
   Don't edit or create other than meeting doc unless instructed.
 
-If everyhting is clear, please confirm.
+If everything is clear, please confirm.
