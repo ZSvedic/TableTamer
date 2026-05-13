@@ -19,6 +19,17 @@ export type ChunkUpdate = {
   after: unknown;
 };
 
+export interface RequestDebugTurn {
+  ops: unknown[];
+  outcome: string;
+  sentBack?: string;
+}
+
+export interface RequestDebugInfo {
+  userRequest: string;
+  turns: RequestDebugTurn[];
+}
+
 export interface HeadlessRunnerOptions {
   model?: string;
   cellModel?: string;
@@ -45,6 +56,7 @@ const DEFAULT_MODEL = process.env.TABLETAMER_MODEL ?? 'claude-sonnet-4-5';
 const DEFAULT_CELL_MODEL = process.env.TABLETAMER_CELL_MODEL ?? 'claude-haiku-4-5';
 const DEFAULT_MAX_RETRIES = 6;
 const DEFAULT_RPM = Number(process.env.TABLETAMER_RPM ?? 40);
+const DEFAULT_CHUNK_SIZE = Number(process.env.TABLETAMER_CHUNK_SIZE ?? 5);
 
 const rateLimiter = (() => {
   const timestamps: number[] = [];
@@ -82,6 +94,11 @@ Spec shape (V1):
   transformations: Transformation[],
   filter?, sort?, page?, summary?
 }
+
+Patchable paths — every path in the spec is fair game for RFC 6902 ops, not just /transformations:
+- /transformations/- (append) is the most common edit.
+- /columns is also patchable (add, remove, reorder). To "add column X with computed value Y", emit ONE patch with TWO ops, in order: first {op:"add", path:"/columns/-", value:{id:"X"}}, then {op:"add", path:"/transformations/-", value:{kind:"mutate", columns:"X", value:<Expr>}} that populates X. Without the second op, X exists but stays empty.
+- /filter, /sort, /page are valid targets when the request is about a single shallow setting.
 
 Transformation grammar (V1):
 - {kind: "filter", pred: Expr}                                     — keep rows where pred(row, i, rows) is truthy
@@ -217,6 +234,7 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     this.busy = true;
     const signal = callOpts.signal ?? this.opts.signal;
     const onChunk = callOpts.onChunk ?? this.opts.onChunk;
+    const debugTurns: RequestDebugTurn[] = [];
     try {
       const budget = this.opts.recoveryBudget ?? 3;
       let lastError: string | undefined;
@@ -224,17 +242,17 @@ class HeadlessRunnerImpl implements HeadlessRunner {
       for (let turn = 0; turn < budget; turn++) {
         if (signal?.aborted) throw new Error('Runner: cancelled');
         const ops = await this.callLlm(userPrompt, signal);
+        const turnLog: RequestDebugTurn = { ops, outcome: '' };
+        debugTurns.push(turnLog);
         const attempt = (() => {
           try {
             if (ops.length === 0) {
-              return { kind: 'err' as const, message: 'You called apply_spec_patch with an empty operations array. Emit at least one {op:"add", path:"/transformations/-", value:<Transformation>} that fulfills the user request.' };
+              return { kind: 'err' as const, message: 'You called apply_spec_patch with an empty operations array. Emit at least one operation that fulfills the user request.' };
             }
             const patched = jsonpatch.applyPatch(structuredClone(this.spec), ops as jsonpatch.Operation[], false, false).newDocument as unknown;
             const validated = validateSpec(patched);
-            if (
-              JSON.stringify(validated.transformations) === JSON.stringify(this.spec.transformations)
-            ) {
-              return { kind: 'err' as const, message: 'Your patch did not change spec.transformations. Re-emit an additive patch that appends a new Transformation to /transformations/-.' };
+            if (JSON.stringify(validated) === JSON.stringify(this.spec)) {
+              return { kind: 'err' as const, message: 'Your patch applied cleanly but left the spec identical to before. Emit operations that actually modify the spec to fulfill the user request.' };
             }
             return { kind: 'ok' as const, spec: validated };
           } catch (e) {
@@ -242,6 +260,8 @@ class HeadlessRunnerImpl implements HeadlessRunner {
           }
         })();
         if (attempt.kind === 'err') {
+          turnLog.outcome = 'rejected';
+          turnLog.sentBack = attempt.message;
           lastError = attempt.message;
           userPrompt = `Your previous patch failed: ${attempt.message}\n\nCurrent spec:\n${JSON.stringify(this.spec, null, 2)}\n\nOriginal user request: ${text}\n\nEmit a corrected patch.`;
           continue;
@@ -251,14 +271,19 @@ class HeadlessRunnerImpl implements HeadlessRunner {
           if (signal?.aborted) throw new Error('Runner: cancelled');
           this.spec = attempt.spec;
           this.derivedRows = newRows;
+          turnLog.outcome = 'committed';
           return;
         } catch (e) {
           if (signal?.aborted || (e as Error).message === 'Runner: cancelled') throw new Error('Runner: cancelled');
+          turnLog.outcome = `evaluation failed: ${(e as Error).message}`;
           lastError = (e as Error).message;
+          turnLog.sentBack = `evaluation error: ${lastError}`;
           userPrompt = `Your previous patch applied but evaluation failed: ${lastError}\n\nCurrent spec:\n${JSON.stringify(this.spec, null, 2)}\n\nOriginal user request: ${text}\n\nEmit a corrected patch.`;
         }
       }
-      throw new Error(`Runner: recovery budget exhausted${lastError ? `; last error: ${lastError}` : ''}`);
+      const err = new Error(`Runner: recovery budget exhausted${lastError ? `; last error: ${lastError}` : ''}`);
+      (err as Error & { debug?: RequestDebugInfo }).debug = { userRequest: text, turns: debugTurns };
+      throw err;
     } finally {
       this.busy = false;
     }
@@ -385,7 +410,7 @@ class HeadlessRunnerImpl implements HeadlessRunner {
         const template = t.value.llm;
         const perCellModel = t.value.model;
         validateTemplate(template, rows);
-        const chunkSize = this.opts.chunkSize ?? 5;
+        const chunkSize = this.opts.chunkSize ?? DEFAULT_CHUNK_SIZE;
         const out: Row[] = rows.map((r) => ({ ...r }));
         for (let i = 0; i < rows.length; i += chunkSize) {
           if (signal?.aborted) throw new Error('Runner: cancelled');

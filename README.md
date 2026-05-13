@@ -24,6 +24,8 @@ Optional env vars and defaults if you omit them:
 | `TABLETAMER_MODEL` | `claude-sonnet-4-5` | Model that writes the spec patch each turn. |
 | `TABLETAMER_CELL_MODEL` | `claude-haiku-4-5` | Model that fills in per-row LLM cells (cheaper, faster). |
 | `TABLETAMER_RPM` | `40` | Per-process request-per-minute cap. The Anthropic org-wide ceiling is 50. |
+| `TABLETAMER_CHUNK_SIZE` | `5` | Parallel LLM calls per chunk during an `{llm:...}` mutate. Doesn't change the *number* of calls (one per row), only the burst shape. |
+| `TABLETAMER_DEBUG` | unset | When set, the REPL prints a per-turn debug block after a failed request (indented, dimmed, capped at 20 lines). |
 
 ## Run the CLI
 

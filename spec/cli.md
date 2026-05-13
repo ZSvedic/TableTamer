@@ -28,6 +28,8 @@ running … row 2: Phone "+44 20 7946" → "+442079460958"
 
 Every line the user types is a natural-language request. The REPL hands it to `runner.request` and reprints the table when the request finishes. Long LLM transformations print a few sample row changes as chunks come back.
 
+`/quit`, `/exit`, `quit`, or `exit` leave the REPL. Ctrl-C cancels a running request; pressed again while idle, it closes the REPL.
+
 ## Batch example
 
 ```console

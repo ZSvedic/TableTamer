@@ -38,7 +38,7 @@ The transformation evaluator runs `spec.transformations` against the immutable s
 
 The chunk dispatcher splits rows into batches, calls the model in parallel, and gathers the answers back in source order. It yields an `AsyncIterable<Update>` so progress and the cancel `AbortSignal` flow through cleanly ([phase-1-pre-spec.md Q10](../phases/phase-1-pre-spec.md)).
 
-The error feedback loop catches Zod validation failures, query failures (a JS expression that throws, an `{Column}` placeholder that doesn't match any column, a V2 feature in a V1 spec), and one shape of LLM mistake: calling `apply_spec_patch` with an empty operations array or with a patch that applies cleanly but leaves `transformations` unchanged. In every case the loop rolls back the patch and feeds the error back to the LLM as the next turn's input. The budget is 3 recovery turns; running out throws.
+The error feedback loop catches Zod validation failures, query failures (a JS expression that throws, an `{Column}` placeholder that doesn't match any column, a V2 feature in a V1 spec), and one shape of LLM mistake: calling `apply_spec_patch` with an empty operations array or with a patch that applies cleanly but leaves the entire spec identical to before. In every case the loop rolls back the patch and feeds the error back to the LLM as the next turn's input. The budget is 3 recovery turns; running out throws an error that carries a `debug` field with the per-turn ops and outcomes — the CLI surfaces it under `TABLETAMER_DEBUG=1`.
 
 ## System prompt
 

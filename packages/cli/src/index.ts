@@ -16,6 +16,7 @@ import {
   type ChunkUpdate,
   type HeadlessRunner,
   type HeadlessRunnerOptions,
+  type RequestDebugInfo,
 } from '@tabletamer/headless';
 
 export interface CliRunnerOptions extends HeadlessRunnerOptions {
@@ -103,6 +104,51 @@ export function renderTable(spec: Spec, rows: Row[]): string {
 function stringify(v: unknown): string {
   if (v === null || v === undefined) return '';
   return String(v);
+}
+
+function userFacingMessage(message: string): string {
+  if (message.startsWith('Runner: recovery budget exhausted')) {
+    return "Couldn't apply that change after 3 attempts. Try rephrasing or breaking it into smaller steps.";
+  }
+  if (message === 'Runner: cancelled') return 'Cancelled.';
+  if (message === 'Runner: a request is already in progress.') return 'A request is already running.';
+  return message;
+}
+
+function renderError(err: Error, stdout: NodeJS.WritableStream): void {
+  stdout.write(`error: ${userFacingMessage(err.message)}\n`);
+  if (!process.env.TABLETAMER_DEBUG) return;
+  const dbg = (err as Error & { debug?: RequestDebugInfo }).debug;
+  if (!dbg) return;
+  const useColor = Boolean((stdout as { isTTY?: boolean }).isTTY);
+  const MAX_LINES = 20;
+  const MAX_OPS_CHARS = 200;
+  const MAX_SENT_CHARS = 120;
+  const lines: string[] = [];
+  lines.push(`request: ${JSON.stringify(dbg.userRequest)}`);
+  for (let i = 0; i < dbg.turns.length; i++) {
+    const t = dbg.turns[i]!;
+    const opsStr = JSON.stringify(t.ops);
+    const opsOut = opsStr.length > MAX_OPS_CHARS
+      ? `${opsStr.slice(0, MAX_OPS_CHARS)}… (+${opsStr.length - MAX_OPS_CHARS} chars)`
+      : opsStr;
+    lines.push(`turn ${i + 1}/${dbg.turns.length}: ops=${opsOut}`);
+    lines.push(`  → outcome: ${t.outcome || 'unknown'}`);
+    if (t.sentBack) {
+      const snip = t.sentBack.length > MAX_SENT_CHARS
+        ? `${t.sentBack.slice(0, MAX_SENT_CHARS)}…`
+        : t.sentBack;
+      lines.push(`  → sent back: ${snip}`);
+    }
+  }
+  lines.push(`(unset TABLETAMER_DEBUG to hide this block)`);
+  const out = lines.length > MAX_LINES
+    ? [...lines.slice(0, MAX_LINES - 1), `… (+${lines.length - MAX_LINES + 1} more lines)`]
+    : lines;
+  for (const line of out) {
+    const prefixed = `    [debug] ${line}`;
+    stdout.write((useColor ? `\x1b[2m${prefixed}\x1b[0m` : prefixed) + '\n');
+  }
 }
 
 export interface RunCliResult {
@@ -217,10 +263,14 @@ async function runRepl(argv: string[], opts: CliRunnerOptions, stderr: string[])
     stderr.push(`tabletamer: ${(e as Error).message}`);
     return { exitCode: 3, stderr: stderr.join('\n') };
   }
-  const ctrl = new AbortController();
-  const onSigint = () => ctrl.abort();
-  process.on('SIGINT', onSigint);
+  let activeRequest: AbortController | null = null;
   const rl = readline.createInterface({ input: stdin as NodeJS.ReadableStream, output: stdout as NodeJS.WritableStream, terminal: false });
+  const onSigint = () => {
+    if (activeRequest) activeRequest.abort();
+    else rl.close();
+  };
+  process.on('SIGINT', onSigint);
+  stdout.write('Type /quit to exit. Ctrl-C cancels a running request (or exits when idle).\n');
   try {
     stdout.write('> ');
     for await (const line of rl) {
@@ -229,11 +279,15 @@ async function runRepl(argv: string[], opts: CliRunnerOptions, stderr: string[])
         stdout.write('> ');
         continue;
       }
-      if (text === '/quit' || text === '/exit') break;
+      if (text === '/quit' || text === '/exit' || text === 'quit' || text === 'exit') break;
+      const ctrl = new AbortController();
+      activeRequest = ctrl;
       try {
         await runner.request(text, { signal: ctrl.signal });
       } catch (e) {
-        stdout.write(`error: ${(e as Error).message}\n`);
+        renderError(e as Error, stdout);
+      } finally {
+        activeRequest = null;
       }
       stdout.write('> ');
     }
