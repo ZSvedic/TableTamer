@@ -1,39 +1,40 @@
-date,commit,bytes,kb
-2026-05-10,1353d28,13112,12.80
-2026-05-10,e5513f3,14182,13.85
-2026-05-10,06665b3,15835,15.46
-2026-05-11,eab21ca,15835,15.46
-2026-05-11,c7799ad,16669,16.28
-2026-05-11,37297ce,20510,20.03
-2026-05-11,6faeff4,21250,20.75
-2026-05-11,07aa525,21250,20.75
-2026-05-11,776924a,24449,23.88
-2026-05-11,d967d50,28206,27.54
-2026-05-11,f81033b,30398,29.69
-2026-05-11,78ef05b,31928,31.18
-2026-05-11,cbfd172,34551,33.74
-2026-05-11,1f8965c,35661,34.83
-2026-05-11,b7dd4b8,38664,37.76
-2026-05-11,5e35e4e,43763,42.74
-2026-05-11,1022a9e,43370,42.35
-2026-05-11,c4687bd,42920,41.91
-2026-05-11,3871aaa,66899,65.33
-2026-05-11,d650bed,73197,71.48
-2026-05-11,89ef836,74533,72.79
-2026-05-11,f0c67c6,80331,78.45
-2026-05-11,0f63bcd,80636,78.75
-2026-05-11,66d7d72,85360,83.36
-2026-05-12,c1788a6,107898,105.37
-2026-05-12,3b1bb47,122083,119.22
-2026-05-13,f2f9c6f,179548,175.34
-2026-05-13,f4271b0,179195,175.00
-2026-05-13,2b04e97,183312,179.02
-2026-05-13,0561aa2,188699,184.28
-2026-05-13,12e4e5b,190272,185.81
-2026-05-13,16e108e,210305,205.38
-2026-05-13,3189cca,218722,213.60
-2026-05-13,199ea57,224302,219.04
-2026-05-13,e08f6b1,225212,219.93
-2026-05-13,a2f27a0,222718,217.50
-2026-05-13,eda7b74,351283,343.05
-2026-05-13,c854826,217623,212.52
+date,commit,bytes,kb,message
+2026-05-10,1353d28,13112,12.80,"Initial commit"
+2026-05-10,e5513f3,14182,13.85,"Add MIT License to the project"
+2026-05-10,06665b3,15835,15.46,"Added project phases."
+2026-05-11,eab21ca,15835,15.46,"Added meeting prompt and renamed file."
+2026-05-11,c7799ad,16669,16.28,"Added the meeting prompt and renamed a file."
+2026-05-11,37297ce,20510,20.03,"Q1 and Q3 answered."
+2026-05-11,6faeff4,21250,20.75,"Q3 answered, modified Gherkin."
+2026-05-11,07aa525,21250,20.75,"Q5 answer and stubs for 9 other test cases."
+2026-05-11,776924a,24449,23.88,"Q5 answer and stubs for 9 other test cases."
+2026-05-11,d967d50,28206,27.54,"Q6 and Q7 answered, added Gherkin for dedup and filter."
+2026-05-11,f81033b,30398,29.69,"Q8 answered."
+2026-05-11,78ef05b,31928,31.18,"Q9 and Q10 answered."
+2026-05-11,cbfd172,34551,33.74,"Q10 and Q11 cancelation update, Gherkin for cancelation."
+2026-05-11,1f8965c,35661,34.83,"Q12 answered."
+2026-05-11,b7dd4b8,38664,37.76,"Added Q13, Q14, and Q15."
+2026-05-11,5e35e4e,43763,42.74,"Phase 1 done, added org dirs."
+2026-05-11,1022a9e,43370,42.35,"merged convention conflicts."
+2026-05-11,c4687bd,42920,41.91,"Minor edits."
+2026-05-11,3871aaa,66899,65.33,"Made node.js project structure for tests."
+2026-05-11,d650bed,73197,71.48,"Added packages/."
+2026-05-11,89ef836,74533,72.79,"Test fixtures created."
+2026-05-11,f0c67c6,80331,78.45,"Common.steps.ts, headless.hooks.ts, cli.hooks.ts, and a cucumber config that picks up .feature files + step defs."
+2026-05-11,0f63bcd,80636,78.75,"Refactor cucumber.js to specify feature paths and export structure; add CLI and headless runner exports in respective index files."
+2026-05-11,66d7d72,85360,83.36,"Phase 2 tests finished."
+2026-05-12,c1788a6,107898,105.37,"Spec phase 3 almost finished."
+2026-05-12,3b1bb47,122083,119.22,"Done with final review."
+2026-05-13,f2f9c6f,179548,175.34,"Implementation and Claude bug fixing finished. Updated specs. Created README.md."
+2026-05-13,f4271b0,179195,175.00,"Removed extra explanations."
+2026-05-13,2b04e97,183312,179.02,"Loosening the patch guardrail. Added better error reporting."
+2026-05-13,0561aa2,188699,184.28,"Added batching (multiple data rows with one LLM call). Added cell-level cacheing."
+2026-05-13,12e4e5b,190272,185.81,"Added CLI help."
+2026-05-13,16e108e,210305,205.38,"Added displaying of action. Switched cell model to Sonnet. Added slash cmds undo and help. Added more tests."
+2026-05-13,3189cca,218722,213.60,"Added /save and save-flow."
+2026-05-13,199ea57,224302,219.04,"Basic tesing: saving of JSONL and flow work."
+2026-05-13,e08f6b1,225212,219.93,"Add project cleanup guidelines for file consistency and simplification"
+2026-05-13,a2f27a0,222718,217.50,"Project cleanup."
+2026-05-13,eda7b74,351283,343.05,"Added commit sizes calc."
+2026-05-13,c854826,217623,212.52,"Refactor for size and clarity; move repo-tracking out of root"
+2026-05-13,6976ae7,217689,212.59,"New commit sizes history."
