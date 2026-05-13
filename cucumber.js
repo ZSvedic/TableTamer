@@ -1,4 +1,4 @@
-const FEATURES = (process.env.TABLETAMER_FEATURES ?? 'datanorm,dedupe,filter,cancelation')
+const FEATURES = (process.env.TABLETAMER_FEATURES ?? 'datanorm,dedupe,filter,cancelation,cli-flags,repl-commands')
   .split(',')
   .map((s) => `test-cases/${s.trim()}.feature`);
 

@@ -10,12 +10,14 @@ import {
   validateSpec,
   type Row,
   type Spec,
+  type Transformation,
 } from '@tabletamer/core';
 import {
   createHeadlessRunner,
   type ChunkUpdate,
   type HeadlessRunner,
   type HeadlessRunnerOptions,
+  type PlanItem,
   type RequestDebugInfo,
 } from '@tabletamer/headless';
 
@@ -49,7 +51,16 @@ class CliRunnerImpl implements CliRunner {
       const afterStr = u.after === null || u.after === undefined ? 'null' : String(u.after);
       this.stdout.write(`running … row ${u.rowIndex + 1}: ${u.column} "${beforeStr}" → "${afterStr}"\n`);
     };
-    this.headless = createHeadlessRunner({ ...opts, onChunk: opts.onChunk ?? onChunk });
+    const onPlan = (items: PlanItem[]) => {
+      if (this.quiet || items.length === 0) return;
+      this.stdout.write('plan:\n');
+      for (const item of items) this.stdout.write(`  • ${formatPlanItem(item)}\n`);
+    };
+    this.headless = createHeadlessRunner({
+      ...opts,
+      onChunk: opts.onChunk ?? onChunk,
+      onPlan: opts.onPlan ?? onPlan,
+    });
   }
 
   async loadInput(path: string): Promise<void> {
@@ -104,6 +115,82 @@ export function renderTable(spec: Spec, rows: Row[]): string {
 function stringify(v: unknown): string {
   if (v === null || v === undefined) return '';
   return String(v);
+}
+
+function formatPlanItem(item: PlanItem): string {
+  switch (item.kind) {
+    case 'add-column':
+      return `add column '${item.id}'`;
+    case 'remove-column':
+      return `remove column '${item.id}'`;
+    case 'reorder-columns':
+      return `reorder columns to: ${item.to.join(', ')}`;
+    case 'add-transformation':
+      return `apply: ${describeTransformation(item.transformation)}`;
+    case 'remove-transformation':
+      return `undo: ${describeTransformation(item.transformation)}`;
+  }
+}
+
+export type SlashCommandAction = 'exit' | 'handled' | 'unhandled';
+
+/**
+ * Handle REPL slash commands and bare-word aliases. Returns:
+ *  - `'exit'` for `exit` / `/exit` (caller should break out of the loop).
+ *  - `'handled'` for `/help` / `/undo` (caller should reprint the prompt and continue).
+ *  - `'unhandled'` for any other input (caller should pass it through to the LLM).
+ * Exported so tests can drive it directly without standing up the readline loop.
+ */
+export async function handleSlashCommand(
+  text: string,
+  runner: CliRunner,
+  stdout: NodeJS.WritableStream
+): Promise<SlashCommandAction> {
+  if (text === 'exit' || text === '/exit') return 'exit';
+  if (text === '/help') {
+    stdout.write(HELP_TEXT);
+    return 'handled';
+  }
+  if (text === '/undo') {
+    const spec = runner.currentSpec();
+    if (spec.transformations.length === 0) {
+      stdout.write('nothing to undo.\n');
+      return 'handled';
+    }
+    const popped = spec.transformations[spec.transformations.length - 1] as Transformation;
+    try {
+      await runner.setSpec({ ...spec, transformations: spec.transformations.slice(0, -1) });
+      stdout.write(`undid: ${describeTransformation(popped)}\n`);
+      stdout.write(renderTable(runner.currentSpec(), runner.currentRows()) + '\n');
+    } catch (e) {
+      renderError(e as Error, stdout);
+    }
+    return 'handled';
+  }
+  return 'unhandled';
+}
+
+function describeTransformation(t: Transformation): string {
+  const trunc = (s: string, n: number) => (s.length > n ? `${s.slice(0, n)}…` : s);
+  switch (t.kind) {
+    case 'filter': {
+      const body = 'js' in t.pred ? t.pred.js : '<llm>';
+      return `filter rows where ${trunc(body, 60)}`;
+    }
+    case 'select':
+      return `keep columns: ${t.columns.join(', ')}`;
+    case 'sort': {
+      const keys = t.by
+        .map((b) => `${typeof b.key === 'string' ? b.key : '<expr>'} ${b.dir}`)
+        .join(', ');
+      return `sort by: ${keys}`;
+    }
+    case 'mutate': {
+      const cols = Array.isArray(t.columns) ? t.columns.join(', ') : t.columns;
+      if ('js' in t.value) return `set '${cols}' via JS: ${trunc(t.value.js, 60)}`;
+      return `set '${cols}' via LLM: ${trunc(t.value.llm, 80)}`;
+    }
+  }
 }
 
 function userFacingMessage(message: string): string {
@@ -166,13 +253,15 @@ Usage:
 
 REPL:
   <natural-language request>   e.g. "normalize country names"
+  /help                        Show this message.
+  /undo                        Pop the last transformation and replay (no LLM call).
   exit                         Leave the REPL (/exit also accepted).
   Ctrl-C                       Cancel a running request, or exit when idle.
 
 Environment (full table in README.md):
   ANTHROPIC_API_KEY        required (loaded from .env if missing or empty)
   TABLETAMER_MODEL         default claude-sonnet-4-5   patch turn
-  TABLETAMER_CELL_MODEL    default claude-haiku-4-5    per-cell turn
+  TABLETAMER_CELL_MODEL    default claude-sonnet-4-5   per-cell turn
   TABLETAMER_BATCH_SIZE    default 20                  rows per LLM request
   TABLETAMER_CHUNK_SIZE    default 5                   concurrent requests
   TABLETAMER_RPM           default 40                  per-process rate cap
@@ -305,7 +394,7 @@ async function runRepl(argv: string[], opts: CliRunnerOptions, stderr: string[])
     else rl.close();
   };
   process.on('SIGINT', onSigint);
-  stdout.write("Type 'exit' to exit. Ctrl-C cancels a running request (or exits when idle).\n");
+  stdout.write("Commands: /help, /undo, exit. Ctrl-C cancels a running request (or exits when idle).\n");
   try {
     stdout.write('> ');
     for await (const line of rl) {
@@ -314,7 +403,12 @@ async function runRepl(argv: string[], opts: CliRunnerOptions, stderr: string[])
         stdout.write('> ');
         continue;
       }
-      if (text === 'exit' || text === '/exit') break;
+      const action = await handleSlashCommand(text, runner, stdout);
+      if (action === 'exit') break;
+      if (action === 'handled') {
+        stdout.write('> ');
+        continue;
+      }
       const ctrl = new AbortController();
       activeRequest = ctrl;
       try {

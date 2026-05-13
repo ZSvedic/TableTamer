@@ -7,13 +7,15 @@
   ],
   "scripts": {
     "test": "bunx --bun cucumber-js --profile headless ; bunx --bun cucumber-js --profile cli",
-    "test:red": "bunx --bun cucumber-js --profile headless ; bunx --bun cucumber-js --profile cli"
+    "test:red": "bunx --bun cucumber-js --profile headless ; bunx --bun cucumber-js --profile cli",
+    "test:offline": "bun test && bunx --bun cucumber-js --profile cli --tags @offline"
   },
   "devDependencies": {
     "@cucumber/cucumber": "^12.8.2",
     "@tabletamer/cli": "workspace:*",
     "@tabletamer/core": "workspace:*",
     "@tabletamer/headless": "workspace:*",
+    "@types/bun": "^1.3.13",
     "@types/node": "^25.6.0",
     "typescript": "^6.0.3"
   }

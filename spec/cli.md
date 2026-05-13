@@ -28,7 +28,7 @@ running … row 2: Phone "+44 20 7946" → "+442079460958"
 
 Every line the user types is a natural-language request. The REPL hands it to `runner.request` and reprints the table when the request finishes. Long LLM transformations print a few sample row changes as chunks come back.
 
-`exit` (or `/exit`, kept for compatibility with the future slash-command surface) leaves the REPL. Ctrl-C cancels a running request; pressed again while idle, it closes the REPL.
+The REPL accepts three slash commands. `/help` prints the usage screen inline. `/undo` pops the last transformation and replays the rest against the source — no LLM call, instant. `/exit` leaves the REPL; `exit` works as a no-slash alias since it's the most common command. Ctrl-C cancels a running request; pressed again while idle, it closes the REPL.
 
 ## Batch example
 

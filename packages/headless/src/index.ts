@@ -30,6 +30,13 @@ export interface RequestDebugInfo {
   turns: RequestDebugTurn[];
 }
 
+export type PlanItem =
+  | { kind: 'add-column'; id: string }
+  | { kind: 'remove-column'; id: string }
+  | { kind: 'reorder-columns'; from: string[]; to: string[] }
+  | { kind: 'add-transformation'; transformation: Transformation }
+  | { kind: 'remove-transformation'; transformation: Transformation };
+
 export interface HeadlessRunnerOptions {
   model?: string;
   cellModel?: string;
@@ -41,6 +48,7 @@ export interface HeadlessRunnerOptions {
   maxRetries?: number;
   rpm?: number;
   onChunk?: (update: ChunkUpdate) => void;
+  onPlan?: (items: PlanItem[]) => void;
   signal?: AbortSignal;
 }
 
@@ -54,7 +62,7 @@ export interface HeadlessRunner {
 }
 
 const DEFAULT_MODEL = process.env.TABLETAMER_MODEL ?? 'claude-sonnet-4-5';
-const DEFAULT_CELL_MODEL = process.env.TABLETAMER_CELL_MODEL ?? 'claude-haiku-4-5';
+const DEFAULT_CELL_MODEL = process.env.TABLETAMER_CELL_MODEL ?? 'claude-sonnet-4-5';
 const DEFAULT_MAX_RETRIES = 6;
 const DEFAULT_RPM = Number(process.env.TABLETAMER_RPM ?? 40);
 const DEFAULT_CHUNK_SIZE = Number(process.env.TABLETAMER_CHUNK_SIZE ?? 5);
@@ -90,6 +98,7 @@ const SYSTEM_PROMPT = `You are TableTamer, an LLM that edits a JSON Spec describ
 Key rules:
 - New requests are additive. Use {op:"add", path:"/transformations/-", value:<Transformation>} to append. Never remove or replace a prior transformation unless the user explicitly says to undo or replace it.
 - Choose {js} only when the rule is purely structural (filter by exact column value, dedupe by key, simple boolean predicates). Choose {llm} for any task that requires semantic understanding (normalize phone/country/date, translate, classify, summarize, infer). The words "normalize", "canonicalize", "translate", "format", "infer", "classify" all signal {llm}. Pick {llm} when unsure.
+- Column targeting: pick the target column from explicit names in the user request ("DOB", "phone column", "Country") or the keyword list annotated on each few-shot below. NEVER default to Phone, Country, or any other column when the request doesn't hint at it — if you can't identify a target, emit an empty operations array and let the recovery loop surface the ambiguity.
 
 Spec shape (V1):
 {
@@ -117,11 +126,11 @@ Expr is one of:
 Few-shot:
 1) "Show only customers in the USA"
    add {kind:"filter", pred:{js:"row.Country === 'USA'"}}
-2) "Normalize phone numbers"
+2) "Normalize phone numbers" — keywords: phone, phones, mobile, cell, telephone
    add {kind:"mutate", columns:"Phone", value:{llm:"Convert this phone number to E.164 format (the canonical international format: a + followed by country code and the remaining digits, no spaces, dashes, parentheses, or dots). Input phone: '{Phone}'. Customer country: '{Country}'. Use ONLY the digits that appear in the input — do not infer, add, or guess area codes or extra digits that are not present. If the input already begins with a leading 00 or +, strip the prefix and treat the rest as country code + national number. Reply with ONLY the resulting E.164 string (e.g. +12005551234) and nothing else. If the number lacks enough information to normalize unambiguously, or is empty, reply with the literal word: null"}}
-3) "Normalize country names"
+3) "Normalize country names" — keywords: country, countries, nation, nationality
    add {kind:"mutate", columns:"Country", value:{llm:"Normalize this country name to its canonical English form. Input: '{Country}'. Reply with ONLY the canonical English name and nothing else. Examples: USA→United States, UK→United Kingdom, England→United Kingdom, Deutschland→Germany, The Bahamas→Bahamas. If empty or unrecognizable, reply with the literal word: null"}}
-4) "Normalize DOB formats"
+4) "Normalize DOB formats" — keywords: DOB, dob, date of birth, birthdate, birthday, born
    add {kind:"mutate", columns:"DOB", value:{llm:"Convert this date of birth to ISO 8601 format YYYY-MM-DD. Input: '{DOB}'. Reply with ONLY the ISO date and nothing else. If the input is empty, 'NA', '-', or otherwise indicates missing data, reply with the literal word: null"}}
 5) "Remove duplicate rows by Email" — keep the FIRST occurrence by Email; drop later duplicates. Use EXACTLY this predicate (it's idiomatic and uses (row, i, rows) signature):
    add {kind:"filter", pred:{js:"rows.findIndex(r => r.Email === row.Email) === i"}}
@@ -234,12 +243,13 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     this.loaded = true;
   }
 
-  async request(text: string, callOpts: { signal?: AbortSignal; onChunk?: (u: ChunkUpdate) => void } = {}): Promise<void> {
+  async request(text: string, callOpts: { signal?: AbortSignal; onChunk?: (u: ChunkUpdate) => void; onPlan?: (items: PlanItem[]) => void } = {}): Promise<void> {
     if (!this.loaded) throw new Error('Runner: no input loaded; call loadInput first.');
     if (this.busy) throw new Error('Runner: a request is already in progress.');
     this.busy = true;
     const signal = callOpts.signal ?? this.opts.signal;
     const onChunk = callOpts.onChunk ?? this.opts.onChunk;
+    const onPlan = callOpts.onPlan ?? this.opts.onPlan;
     const debugTurns: RequestDebugTurn[] = [];
     try {
       const budget = this.opts.recoveryBudget ?? 3;
@@ -271,6 +281,10 @@ class HeadlessRunnerImpl implements HeadlessRunner {
           lastError = attempt.message;
           userPrompt = `Your previous patch failed: ${attempt.message}\n\nCurrent spec:\n${JSON.stringify(this.spec, null, 2)}\n\nOriginal user request: ${text}\n\nEmit a corrected patch.`;
           continue;
+        }
+        if (onPlan) {
+          const plan = computePlan(this.spec, attempt.spec);
+          if (plan.length > 0) onPlan(plan);
         }
         try {
           const newRows = await this.replay(attempt.spec, this.sourceRows, signal, onChunk);
@@ -539,7 +553,37 @@ class HeadlessRunnerImpl implements HeadlessRunner {
   }
 }
 
-function tryParseBatchResponse(text: string, expectedLen: number): unknown[] | undefined {
+/** @internal — exported for unit tests. */
+export function computePlan(oldSpec: Spec, newSpec: Spec): PlanItem[] {
+  const items: PlanItem[] = [];
+  const oldIds = oldSpec.columns.map((c) => c.id);
+  const newIds = newSpec.columns.map((c) => c.id);
+  const oldSet = new Set(oldIds);
+  const newSet = new Set(newIds);
+  for (const id of newIds) if (!oldSet.has(id)) items.push({ kind: 'add-column', id });
+  for (const id of oldIds) if (!newSet.has(id)) items.push({ kind: 'remove-column', id });
+  const sameSet = oldIds.length === newIds.length && oldIds.every((id) => newSet.has(id));
+  if (sameSet && oldIds.some((id, i) => id !== newIds[i])) {
+    items.push({ kind: 'reorder-columns', from: oldIds, to: newIds });
+  }
+  const oldT = oldSpec.transformations;
+  const newT = newSpec.transformations;
+  let prefix = 0;
+  while (
+    prefix < oldT.length &&
+    prefix < newT.length &&
+    JSON.stringify(oldT[prefix]) === JSON.stringify(newT[prefix])
+  )
+    prefix++;
+  for (let i = prefix; i < oldT.length; i++)
+    items.push({ kind: 'remove-transformation', transformation: oldT[i] as Transformation });
+  for (let i = prefix; i < newT.length; i++)
+    items.push({ kind: 'add-transformation', transformation: newT[i] as Transformation });
+  return items;
+}
+
+/** @internal — exported for unit tests. */
+export function tryParseBatchResponse(text: string, expectedLen: number): unknown[] | undefined {
   let cleaned = text.trim();
   if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
