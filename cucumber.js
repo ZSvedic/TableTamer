@@ -1,9 +1,9 @@
+const FEATURES = (process.env.TABLETAMER_FEATURES ?? 'datanorm,dedupe,filter,cancelation')
+  .split(',')
+  .map((s) => `test-cases/${s.trim()}.feature`);
+
 const common = {
-  paths: [
-    'test-cases/datanorm.feature',
-    'test-cases/dedupe.feature',
-    'test-cases/filter.feature',
-  ],
+  paths: FEATURES,
   import: ['test-cases/step-defs/**/*.ts'],
 };
 

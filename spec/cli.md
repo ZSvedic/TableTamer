@@ -57,10 +57,9 @@ The process-level entry point. It returns `{ exitCode, stderr }` instead of call
 ```
 flow    = readJson(<flow>)        # parse + Zod-validate
 csvPath = --input || flow.source  # --input wins
-source  = loadCsv(csvPath)
-runner.spec = flow.spec
-rows    = runner.currentRows()    # replays transformations
-writeJsonl(--output, rows)
+runner.loadInput(csvPath)
+runner.setSpec(flow.spec)         # replays transformations against the source
+runner.exportAs(--output)
 ```
 
 No LLM call happens on this path ([phase-1-pre-spec.md Q15](../phases/phase-1-pre-spec.md)).

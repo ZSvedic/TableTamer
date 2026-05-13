@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "source": "filter-input.csv",
+  "spec": {
+    "table": "filter-input.csv",
+    "columns": [
+      { "id": "ID" },
+      { "id": "Name" },
+      { "id": "Email" },
+      { "id": "Country" }
+    ],
+    "transformations": [
+      {
+        "kind": "filter",
+        "pred": { "js": "row.Country === 'USA'" }
+      }
+    ]
+  }
+}

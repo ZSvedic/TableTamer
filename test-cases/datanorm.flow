@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "source": "datanorm-input.csv",
+  "spec": {
+    "table": "datanorm-input.csv",
+    "columns": [
+      { "id": "ID" },
+      { "id": "FirstName" },
+      { "id": "LastName" },
+      { "id": "DOB" },
+      { "id": "Country" },
+      { "id": "Phone" }
+    ],
+    "transformations": [
+      {
+        "kind": "mutate",
+        "columns": "Phone",
+        "value": {
+          "llm": "Convert this phone number to E.164 format (a + followed by country code and the remaining digits with no spaces, dashes, parentheses, or dots). Input phone: '{Phone}'. Customer country: '{Country}'. Use ONLY the digits already present in the input — do not infer, guess, or add area codes or extra digits that are not literally in the input. If the input begins with 00 or +, strip the prefix and keep the rest. Reply with only the resulting E.164 string and no other text. If the number lacks enough information to normalize unambiguously (missing country/area code, value like 'NA' or '-' or empty), reply with the literal word: null"
+        }
+      },
+      {
+        "kind": "mutate",
+        "columns": "Country",
+        "value": {
+          "llm": "Normalize this country name to its standard English form. Input: '{Country}'. Reply with only the canonical English country name and nothing else. Examples: 'USA' -> 'United States', 'UK' or 'England' -> 'United Kingdom', 'The Bahamas' or 'Bahamas' -> 'Bahamas', 'Deutschland' -> 'Germany'."
+        }
+      },
+      {
+        "kind": "mutate",
+        "columns": "DOB",
+        "value": {
+          "llm": "Convert this date of birth to ISO format YYYY-MM-DD. Input: '{DOB}'. Reply with only the ISO date and nothing else. If the value is empty, 'NA', '-', or otherwise indicates missing data, reply with the literal word: null"
+        }
+      }
+    ]
+  }
+}

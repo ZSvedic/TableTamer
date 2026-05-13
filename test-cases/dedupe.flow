@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "source": "dedupe-input.csv",
+  "spec": {
+    "table": "dedupe-input.csv",
+    "columns": [
+      { "id": "ID" },
+      { "id": "Name" },
+      { "id": "Email" },
+      { "id": "Country" }
+    ],
+    "transformations": [
+      {
+        "kind": "filter",
+        "pred": { "js": "rows.findIndex(r => r.Email === row.Email) === i" }
+      }
+    ]
+  }
+}

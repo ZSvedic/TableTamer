@@ -38,7 +38,7 @@ The transformation evaluator runs `spec.transformations` against the immutable s
 
 The chunk dispatcher splits rows into batches, calls the model in parallel, and gathers the answers back in source order. It yields an `AsyncIterable<Update>` so progress and the cancel `AbortSignal` flow through cleanly ([phase-1-pre-spec.md Q10](../phases/phase-1-pre-spec.md)).
 
-The error feedback loop catches Zod validation failures and query failures (a JS expression that throws, an `{Column}` placeholder that doesn't match any column, a V2 feature in a V1 spec). When one of those happens, the loop rolls back the patch and feeds the error back to the LLM as the next turn's input. The budget is 3 recovery turns; running out throws.
+The error feedback loop catches Zod validation failures, query failures (a JS expression that throws, an `{Column}` placeholder that doesn't match any column, a V2 feature in a V1 spec), and one shape of LLM mistake: calling `apply_spec_patch` with an empty operations array or with a patch that applies cleanly but leaves `transformations` unchanged. In every case the loop rolls back the patch and feeds the error back to the LLM as the next turn's input. The budget is 3 recovery turns; running out throws.
 
 ## System prompt
 
@@ -60,3 +60,9 @@ Per-turn slots that aren't cached: the current spec (~300 tokens), the user's re
 While an LLM transformation runs, each completed chunk fires the `onChunk` callback with the rows it just produced. The committed spec and rows don't change until the whole transformation finishes; the callback is how the CLI prints progress lines and how the future web shell will paint skeleton rows.
 
 A cancel triggers the four-step sequence in [runner.md](runner.md#cancellation). What's specific to headless: the `AbortSignal` is what stops the chunk dispatcher from scheduling new model calls; model calls that are already running finish before step 3 reverts the half-applied transformation.
+
+## Determinism
+
+The runtime pins `temperature: 0` on every model call, but that doesn't make outputs byte-identical across model versions or providers. Sonnet and Haiku both produce plausible E.164 phone numbers for an ambiguous input like `"020 555 8765"`, but the exact normalization differs — and the LLM's own minor revisions can change the answer for the same prompt over time. Tests that compare LLM-produced cells against a frozen golden JSONL file are testing one specific `(model, version, prompt)` triple, not the transformation contract.
+
+V1 ships the golden files anyway because the fixtures are small and the convenience outweighs the fragility. A future revision should either pin each golden to a stamped `(model, version)` pair, or assert the semantic invariant — *"output starts with `+<country code>` and contains every digit from the input"* — instead of string equality. Until then, golden mismatches on LLM-driven cells aren't necessarily regressions.
