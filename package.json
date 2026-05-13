@@ -7,7 +7,6 @@
   ],
   "scripts": {
     "test": "bunx --bun cucumber-js --profile headless ; bunx --bun cucumber-js --profile cli",
-    "test:red": "bunx --bun cucumber-js --profile headless ; bunx --bun cucumber-js --profile cli",
     "test:offline": "bun test && bunx --bun cucumber-js --profile cli --tags @offline"
   },
   "devDependencies": {

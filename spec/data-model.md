@@ -14,7 +14,7 @@ Treating chat history as the state of record breaks at large-table scale:
 Decouple **spec** from **data**:
 
 1. **Spec** — a small JSON document describing the *view* over the table (columns, filter, sort, page, pivot, aggregations). The LLM owns this; the runtime persists it across turns.
-2. **Data** — the actual rows, materialized server-side by running the spec as a query. Streamed to the client; **never** to the LLM.x
+2. **Data** — the actual rows, materialized server-side by running the spec as a query. Streamed to the client; **never** to the LLM.
 
 Each turn, the model emits a **patch** to the spec — [JSON Merge Patch (RFC 7396)](https://datatracker.ietf.org/doc/html/rfc7396) for shallow edits, [JSON Patch (RFC 6902)](https://datatracker.ietf.org/doc/html/rfc6902) for array ops merge-patch can't express.
 

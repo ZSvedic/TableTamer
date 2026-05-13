@@ -3,10 +3,7 @@ import * as readline from 'node:readline/promises';
 import { readFile, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import {
-  loadCsv,
   loadEnv,
-  readJsonl,
-  writeJsonl,
   validateSpec,
   type Row,
   type Spec,
