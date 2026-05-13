@@ -156,6 +156,36 @@ export interface RunCliResult {
   stderr: string;
 }
 
+const HELP_TEXT = `tabletamer — natural-language ETL for CSV files
+
+Usage:
+  tabletamer <input.csv>                          Start the interactive REPL.
+  tabletamer execute <flow> --output <out.jsonl>  Replay a saved .flow against a CSV (no LLM call).
+                                                  --input <csv> overrides flow.source.
+  tabletamer --help, -h                           Show this message.
+
+REPL:
+  <natural-language request>   e.g. "normalize country names"
+  exit                         Leave the REPL (/exit also accepted).
+  Ctrl-C                       Cancel a running request, or exit when idle.
+
+Environment (full table in README.md):
+  ANTHROPIC_API_KEY        required (loaded from .env if missing or empty)
+  TABLETAMER_MODEL         default claude-sonnet-4-5   patch turn
+  TABLETAMER_CELL_MODEL    default claude-haiku-4-5    per-cell turn
+  TABLETAMER_BATCH_SIZE    default 20                  rows per LLM request
+  TABLETAMER_CHUNK_SIZE    default 5                   concurrent requests
+  TABLETAMER_RPM           default 40                  per-process rate cap
+  TABLETAMER_DEBUG         unset                       print per-turn debug block on failure
+
+Exit codes (execute mode):
+  0  success                3  CSV / transformation error
+  1  bad invocation         4  output write error
+  2  bad .flow file
+
+Docs: README.md, spec/cli.md.
+`;
+
 export async function runCli(argv: string[], opts: CliRunnerOptions = {}): Promise<RunCliResult> {
   const stderr: string[] = [];
   const fail = (code: number, msg: string): RunCliResult => {
@@ -163,15 +193,20 @@ export async function runCli(argv: string[], opts: CliRunnerOptions = {}): Promi
     return { exitCode: code, stderr: stderr.join('\n') };
   };
 
+  if (argv[0] === '--help' || argv[0] === '-h' || argv[0] === 'help') {
+    (opts.stdout ?? process.stdout).write(HELP_TEXT);
+    return { exitCode: 0, stderr: '' };
+  }
+
   if (argv.length === 0) {
-    return fail(1, 'tabletamer: REPL mode requires a CSV path. Usage: tabletamer <input.csv> | tabletamer execute <flow> --input <csv> --output <jsonl>');
+    return fail(1, 'tabletamer: REPL mode requires a CSV path. Try --help for usage.');
   }
 
   if (argv[0] === 'execute') {
     return runExecute(argv.slice(1), opts, stderr);
   }
   if (argv[0]?.startsWith('-')) {
-    return fail(1, `tabletamer: unrecognized option ${argv[0]}`);
+    return fail(1, `tabletamer: unrecognized option ${argv[0]} (try --help)`);
   }
   // REPL mode
   return runRepl(argv, opts, stderr);

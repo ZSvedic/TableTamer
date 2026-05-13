@@ -54,7 +54,7 @@ Options forward to `createHeadlessRunner`. By default the runner writes to `proc
 
 ## `runCli(argv)`
 
-The process-level entry point. It returns `{ exitCode, stderr }` instead of calling `process.exit`, so callers can decide what to do with a failure — the step in [common.steps.ts](../test-cases/step-defs/common.steps.ts) reads the exit code directly. With no subcommand, `runCli` starts the REPL; with `execute <flow>`, it runs the batch path:
+The process-level entry point. It returns `{ exitCode, stderr }` instead of calling `process.exit`, so callers can decide what to do with a failure — the step in [common.steps.ts](../test-cases/step-defs/common.steps.ts) reads the exit code directly. `--help`, `-h`, and `help` print a usage screen to stdout and exit 0. With no subcommand, `runCli` starts the REPL; with `execute <flow>`, it runs the batch path:
 
 ```
 flow    = readJson(<flow>)        # parse + Zod-validate
