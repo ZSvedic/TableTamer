@@ -79,7 +79,7 @@ type Transformation =
 `Expr` lets any verb swap deterministic code for an LLM prompt:
 - `{js: "..."}` → `new Function()`-evaluated arrow function; signature `(row, index, allRows) => result`. **V1.**
 - `{sql: "..."}` → DuckDB. **V2.**
-- `{llm: "..."}` → batch rows, parallel-call the model, gather results; results cached by `(input cells + prompt + model)` (V2).
+- `{llm: "..."}` → render one prompt per row, **batch** N rendered prompts into a single LLM call that replies with a JSON array of N results, run several batches in parallel, and cache by `(model, rendered prompt)` so duplicate inputs cost nothing after the first. **V1.**
 
 **V1 subset:** `filter` + `mutate` (both modes) + `select` + `sort` (sql only). `group`/`join` are V2.
 

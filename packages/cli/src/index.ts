@@ -270,7 +270,7 @@ async function runRepl(argv: string[], opts: CliRunnerOptions, stderr: string[])
     else rl.close();
   };
   process.on('SIGINT', onSigint);
-  stdout.write('Type /quit to exit. Ctrl-C cancels a running request (or exits when idle).\n');
+  stdout.write("Type 'exit' to exit. Ctrl-C cancels a running request (or exits when idle).\n");
   try {
     stdout.write('> ');
     for await (const line of rl) {
@@ -279,7 +279,7 @@ async function runRepl(argv: string[], opts: CliRunnerOptions, stderr: string[])
         stdout.write('> ');
         continue;
       }
-      if (text === '/quit' || text === '/exit' || text === 'quit' || text === 'exit') break;
+      if (text === 'exit' || text === '/exit') break;
       const ctrl = new AbortController();
       activeRequest = ctrl;
       try {

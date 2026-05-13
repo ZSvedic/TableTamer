@@ -24,12 +24,13 @@ Optional env vars and defaults if you omit them:
 | `TABLETAMER_MODEL` | `claude-sonnet-4-5` | Model that writes the spec patch each turn. |
 | `TABLETAMER_CELL_MODEL` | `claude-haiku-4-5` | Model that fills in per-row LLM cells (cheaper, faster). |
 | `TABLETAMER_RPM` | `40` | Per-process request-per-minute cap. The Anthropic org-wide ceiling is 50. |
-| `TABLETAMER_CHUNK_SIZE` | `5` | Parallel LLM calls per chunk during an `{llm:...}` mutate. Doesn't change the *number* of calls (one per row), only the burst shape. |
+| `TABLETAMER_BATCH_SIZE` | `20` | Rows packed into a single LLM request. The model replies with a JSON array; on a parse failure the runner falls back to per-row calls for that batch. Set to `1` to disable batching. |
+| `TABLETAMER_CHUNK_SIZE` | `5` | LLM requests that fire concurrently. Orthogonal to batch size — total parallel rows = batch × chunk. |
 | `TABLETAMER_DEBUG` | unset | When set, the REPL prints a per-turn debug block after a failed request (indented, dimmed, capped at 20 lines). |
 
 ## Run the CLI
 
-Interactive REPL — load a CSV, then type requests until you `/quit`:
+Interactive REPL — load a CSV, then type requests until you `exit`:
 
 ```
 bun packages/cli/src/index.ts test-cases/datanorm-input.csv
@@ -44,7 +45,7 @@ running … row 1: Phone "555-123-4567" → "+15551234567"
  Email                | Phone           | Country
  alice@example.com    | +15551234567    | usa
  ...
-> /quit
+> exit
 ```
 
 Ctrl-C cancels an in-progress request and rolls back the half-applied transformation.

@@ -33,7 +33,7 @@ V1 keeps four pure verbs and two expression shapes; everything else is V2.
 
 A JS expression is the body of an arrow function with signature `(row, index, allRows) => result` ([phase-1-pre-spec.md Q13](../phases/phase-1-pre-spec.md)). The runtime wraps it as `return (<body>)` and compiles it once.
 
-An LLM expression is a prompt template with `{Column}` placeholders. Before each call, the runtime swaps each `{Column}` for that row's value in that column. A placeholder that doesn't match any column is an error, and the recovery loop in [runner.md](runner.md) feeds the error back to the LLM.
+An LLM expression is a prompt template with `{Column}` placeholders. The runtime renders one prompt per row by substituting `{Column}` for that row's value, then batches multiple rendered prompts into a single LLM call (default 20 rows per call) that replies with a JSON array of results — see [headless.md](headless.md) for the batch protocol. Identical rendered prompts hit a per-session cache, so duplicate inputs cost nothing after the first. A placeholder that doesn't match any column is an error, and the recovery loop in [runner.md](runner.md) feeds the error back to the LLM.
 
 ## I/O
 

@@ -36,6 +36,7 @@ export interface HeadlessRunnerOptions {
   apiKey?: string;
   baseURL?: string;
   chunkSize?: number;
+  batchSize?: number;
   recoveryBudget?: number;
   maxRetries?: number;
   rpm?: number;
@@ -57,6 +58,9 @@ const DEFAULT_CELL_MODEL = process.env.TABLETAMER_CELL_MODEL ?? 'claude-haiku-4-
 const DEFAULT_MAX_RETRIES = 6;
 const DEFAULT_RPM = Number(process.env.TABLETAMER_RPM ?? 40);
 const DEFAULT_CHUNK_SIZE = Number(process.env.TABLETAMER_CHUNK_SIZE ?? 5);
+const DEFAULT_BATCH_SIZE = Number(process.env.TABLETAMER_BATCH_SIZE ?? 20);
+
+const BATCH_SYSTEM_PROMPT = `You will process several independent micro-tasks. Apply each task's instructions exactly to its own content. Return ONLY a JSON array of entries, one per task, in the same order as the tasks — no prose, no explanation, no markdown fences. Each entry is either a string (the per-task result) or the JSON literal null (when the per-task instructions say to reply null).`;
 
 const rateLimiter = (() => {
   const timestamps: number[] = [];
@@ -155,6 +159,7 @@ class HeadlessRunnerImpl implements HeadlessRunner {
   private modelCache: ReturnType<ReturnType<typeof createAnthropic>> | undefined;
   private cellModelCache: ReturnType<ReturnType<typeof createAnthropic>> | undefined;
   private providerCache: ReturnType<typeof createAnthropic> | undefined;
+  private cellResultCache = new Map<string, unknown>();
   private loaded = false;
   private busy = false;
 
@@ -201,6 +206,7 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     this.sourcePath = sourcePath;
     this.spec = spec;
     this.derivedRows = rows.slice();
+    this.cellResultCache.clear();
     this.loaded = true;
   }
 
@@ -410,25 +416,33 @@ class HeadlessRunnerImpl implements HeadlessRunner {
         const template = t.value.llm;
         const perCellModel = t.value.model;
         validateTemplate(template, rows);
-        const chunkSize = this.opts.chunkSize ?? DEFAULT_CHUNK_SIZE;
+        const batchSize = Math.max(1, this.opts.batchSize ?? DEFAULT_BATCH_SIZE);
+        const chunkSize = Math.max(1, this.opts.chunkSize ?? DEFAULT_CHUNK_SIZE);
         const out: Row[] = rows.map((r) => ({ ...r }));
-        for (let i = 0; i < rows.length; i += chunkSize) {
+        const batches: Array<{ start: number; rows: Row[] }> = [];
+        for (let i = 0; i < rows.length; i += batchSize) {
+          batches.push({ start: i, rows: rows.slice(i, i + batchSize) });
+        }
+        for (let g = 0; g < batches.length; g += chunkSize) {
           if (signal?.aborted) throw new Error('Runner: cancelled');
-          const batch = rows.slice(i, i + chunkSize);
-          const results = await Promise.all(
-            batch.map((row) => this.evalLlmCell(template, row, perCellModel, signal))
+          const group = batches.slice(g, g + chunkSize);
+          const groupResults = await Promise.all(
+            group.map((b) => this.evalLlmBatch(template, b.rows, perCellModel, signal))
           );
           if (signal?.aborted) throw new Error('Runner: cancelled');
-          for (let j = 0; j < batch.length; j++) {
-            const value = results[j];
-            const rowIndex = i + j;
-            for (const c of cols) {
-              const before = out[rowIndex]![c];
-              out[rowIndex]![c] = value;
-              if (onChunk) onChunk({ transformationIndex: tIndex, rowIndex, column: c, before, after: value });
+          for (let gi = 0; gi < group.length; gi++) {
+            const b = group[gi]!;
+            const results = groupResults[gi]!;
+            for (let j = 0; j < b.rows.length; j++) {
+              const value = results[j];
+              const rowIndex = b.start + j;
+              for (const c of cols) {
+                const before = out[rowIndex]![c];
+                out[rowIndex]![c] = value;
+                if (onChunk) onChunk({ transformationIndex: tIndex, rowIndex, column: c, before, after: value });
+              }
             }
           }
-          if (signal?.aborted) throw new Error('Runner: cancelled');
           // yield to the event loop so a pending abort.abort() in the test harness
           // is observed before the next chunk starts.
           await new Promise((r) => setTimeout(r, 0));
@@ -438,11 +452,78 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     }
   }
 
-  private async evalLlmCell(template: string, row: Row, perCellModel: string | undefined, signal?: AbortSignal): Promise<unknown> {
-    const prompt = template.replace(/\{([^{}]+)\}/g, (_, col) => {
+  private renderPrompt(template: string, row: Row): string {
+    return template.replace(/\{([^{}]+)\}/g, (_, col) => {
       const v = row[col];
       return v === null || v === undefined ? '' : String(v);
     });
+  }
+
+  private cacheKey(perCellModel: string | undefined, prompt: string): string {
+    const modelName = perCellModel ?? this.opts.cellModel ?? DEFAULT_CELL_MODEL;
+    return `${modelName} ${prompt}`;
+  }
+
+  private async evalLlmBatch(
+    template: string,
+    rows: Row[],
+    perCellModel: string | undefined,
+    signal?: AbortSignal
+  ): Promise<unknown[]> {
+    if (rows.length === 0) return [];
+    const prompts = rows.map((r) => this.renderPrompt(template, r));
+    const results: unknown[] = new Array(rows.length);
+    const pendingIdx: number[] = [];
+    const pendingPrompts: string[] = [];
+    for (let i = 0; i < prompts.length; i++) {
+      const key = this.cacheKey(perCellModel, prompts[i]!);
+      if (this.cellResultCache.has(key)) {
+        results[i] = this.cellResultCache.get(key);
+      } else {
+        pendingIdx.push(i);
+        pendingPrompts.push(prompts[i]!);
+      }
+    }
+    if (pendingPrompts.length === 0) return results;
+    const fetched = await this.callLlmBatch(pendingPrompts, perCellModel, signal);
+    for (let k = 0; k < pendingIdx.length; k++) {
+      const val = fetched[k];
+      const idx = pendingIdx[k]!;
+      results[idx] = val;
+      this.cellResultCache.set(this.cacheKey(perCellModel, pendingPrompts[k]!), val);
+    }
+    return results;
+  }
+
+  private async callLlmBatch(
+    prompts: string[],
+    perCellModel: string | undefined,
+    signal?: AbortSignal
+  ): Promise<unknown[]> {
+    if (prompts.length === 0) return [];
+    if (prompts.length === 1) return [await this.callLlmOnce(prompts[0]!, perCellModel, signal)];
+    const userMessage = prompts.map((p, i) => `[${i + 1}]\n${p}`).join('\n\n---\n\n');
+    await rateLimiter.acquire(signal);
+    const result = await generateText({
+      model: this.cellModel(perCellModel),
+      system: BATCH_SYSTEM_PROMPT,
+      prompt: userMessage,
+      abortSignal: signal,
+      temperature: 0,
+      maxRetries: this.opts.maxRetries ?? DEFAULT_MAX_RETRIES,
+      providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
+    });
+    const parsed = tryParseBatchResponse(result.text ?? '', prompts.length);
+    if (parsed) return parsed;
+    // Fallback: per-cell, in parallel.
+    return Promise.all(prompts.map((p) => this.callLlmOnce(p, perCellModel, signal)));
+  }
+
+  private async callLlmOnce(
+    prompt: string,
+    perCellModel: string | undefined,
+    signal?: AbortSignal
+  ): Promise<unknown> {
     await rateLimiter.acquire(signal);
     const result = await generateText({
       model: this.cellModel(perCellModel),
@@ -455,6 +536,27 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     const text = (result.text ?? '').trim();
     if (text === '' || text.toLowerCase() === 'null') return null;
     return text;
+  }
+}
+
+function tryParseBatchResponse(text: string, expectedLen: number): unknown[] | undefined {
+  let cleaned = text.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim();
+  }
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (!Array.isArray(parsed) || parsed.length !== expectedLen) return undefined;
+    return parsed.map((v) => {
+      if (v === null) return null;
+      if (typeof v === 'string') {
+        const t = v.trim();
+        return t === '' || t.toLowerCase() === 'null' ? null : t;
+      }
+      return String(v);
+    });
+  } catch {
+    return undefined;
   }
 }
 
