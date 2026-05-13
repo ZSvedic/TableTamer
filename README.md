@@ -16,15 +16,14 @@ You need [bun](https://bun.sh) and an Anthropic API key.
    ```
    ANTHROPIC_API_KEY=sk-ant-...
    ```
-   That's it — the CLI and the tests both read `.env` automatically through `loadEnv()` in `@tabletamer/core`. No `export` lines, no `unset` workaround, no shell-rc edits. If `ANTHROPIC_API_KEY` is already set non-empty in your shell, the shell value wins; if it's missing or empty, `.env` fills it in.
 
-Optional env vars (sensible defaults if you omit them):
+Optional env vars and defaults if you omit them:
 
 | Var | Default | What it does |
 |---|---|---|
 | `TABLETAMER_MODEL` | `claude-sonnet-4-5` | Model that writes the spec patch each turn. |
 | `TABLETAMER_CELL_MODEL` | `claude-haiku-4-5` | Model that fills in per-row LLM cells (cheaper, faster). |
-| `TABLETAMER_RPM` | `40` | Per-process request-per-minute cap. The Anthropic org-wide ceiling is 50; the default leaves headroom for retries. |
+| `TABLETAMER_RPM` | `40` | Per-process request-per-minute cap. The Anthropic org-wide ceiling is 50. |
 
 ## Run the CLI
 
