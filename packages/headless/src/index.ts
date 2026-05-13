@@ -237,6 +237,9 @@ class HeadlessRunnerImpl implements HeadlessRunner {
 
   async setSpec(spec: Spec): Promise<void> {
     const validated = validateSpec(spec);
+    // Anchor spec.table to the loadInput'd source so downstream consumers
+    // (e.g. /save-flow) can always recover the CSV path.
+    if (this.sourcePath) validated.table = this.sourcePath;
     const rows = await this.replay(validated, this.sourceRows, undefined, undefined);
     this.spec = validated;
     this.derivedRows = rows;

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S bun run
 import * as readline from 'node:readline/promises';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import * as path from 'node:path';
 import {
   loadCsv,
@@ -167,6 +167,48 @@ export async function handleSlashCommand(
     }
     return 'handled';
   }
+  if (text === '/save-flow' || text.startsWith('/save-flow ')) {
+    const rest = text === '/save-flow' ? '' : text.slice('/save-flow '.length).trim();
+    if (!rest) {
+      stdout.write('/save-flow: missing path. Usage: /save-flow <out.flow>\n');
+      return 'handled';
+    }
+    const spec = runner.currentSpec();
+    const sourceTable = spec.table;
+    if (!sourceTable) {
+      stdout.write('/save-flow: spec has no source CSV table; cannot write a flow.\n');
+      return 'handled';
+    }
+    try {
+      const flowDir = path.dirname(path.resolve(rest));
+      const absSource = path.resolve(sourceTable);
+      const relSource = path.relative(flowDir, absSource);
+      // Use a clean relative path when the source sits at or below the flow
+      // file's directory; otherwise fall back to an absolute path rather than
+      // emit a ..-heavy traversal.
+      const sourceForFlow = relSource.startsWith('..') ? absSource : relSource;
+      const flow = { version: 1, source: sourceForFlow, spec };
+      await writeFile(rest, JSON.stringify(flow, null, 2) + '\n', 'utf8');
+      stdout.write(`saved flow (${spec.transformations.length} transformations) to ${rest}\n`);
+    } catch (e) {
+      renderError(e as Error, stdout);
+    }
+    return 'handled';
+  }
+  if (text === '/save' || text.startsWith('/save ')) {
+    const rest = text === '/save' ? '' : text.slice('/save '.length).trim();
+    if (!rest) {
+      stdout.write('/save: missing path. Usage: /save <output.jsonl>\n');
+      return 'handled';
+    }
+    try {
+      await runner.exportAs(rest);
+      stdout.write(`saved ${runner.currentRows().length} rows to ${rest}\n`);
+    } catch (e) {
+      renderError(e as Error, stdout);
+    }
+    return 'handled';
+  }
   return 'unhandled';
 }
 
@@ -255,6 +297,8 @@ REPL:
   <natural-language request>   e.g. "normalize country names"
   /help                        Show this message.
   /undo                        Pop the last transformation and replay (no LLM call).
+  /save <out.jsonl>            Write current rows to a JSONL file (cwd-relative).
+  /save-flow <out.flow>        Write the current spec as a replayable .flow file.
   exit                         Leave the REPL (/exit also accepted).
   Ctrl-C                       Cancel a running request, or exit when idle.
 
@@ -394,7 +438,7 @@ async function runRepl(argv: string[], opts: CliRunnerOptions, stderr: string[])
     else rl.close();
   };
   process.on('SIGINT', onSigint);
-  stdout.write("Commands: /help, /undo, exit. Ctrl-C cancels a running request (or exits when idle).\n");
+  stdout.write("Commands: /help, /undo, /save, /save-flow, exit. Ctrl-C cancels a running request (or exits when idle).\n");
   try {
     stdout.write('> ');
     for await (const line of rl) {

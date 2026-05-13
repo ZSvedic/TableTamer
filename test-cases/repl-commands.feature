@@ -39,3 +39,45 @@ Feature: REPL slash commands
       """
     Then REPL exit code is 0
     And REPL stdout contains "nothing to undo."
+
+  @cli @offline
+  Scenario: /save without a path prints usage
+    When user enters the REPL with "dedupe-input.csv" and types:
+      """
+      /save
+      exit
+      """
+    Then REPL exit code is 0
+    And REPL stdout contains "/save: missing path"
+
+  @cli @offline
+  Scenario: /save writes current rows to a JSONL file
+    When user enters the REPL with "dedupe-input.csv" and types:
+      """
+      /save test-cases/repl-save-output.jsonl
+      exit
+      """
+    Then REPL exit code is 0
+    And REPL stdout contains "saved"
+    And "repl-save-output.jsonl" exists
+
+  @cli @offline
+  Scenario: /save-flow without a path prints usage
+    When user enters the REPL with "dedupe-input.csv" and types:
+      """
+      /save-flow
+      exit
+      """
+    Then REPL exit code is 0
+    And REPL stdout contains "/save-flow: missing path"
+
+  @cli @offline
+  Scenario: /save-flow writes a replayable flow file
+    When user enters the REPL with "dedupe-input.csv" and types:
+      """
+      /save-flow test-cases/repl-save-flow-output.flow
+      exit
+      """
+    Then REPL exit code is 0
+    And REPL stdout contains "saved flow"
+    And "repl-save-flow-output.flow" exists

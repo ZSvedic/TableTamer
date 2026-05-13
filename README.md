@@ -30,7 +30,7 @@ Optional env vars and defaults if you omit them:
 
 ## Run the CLI
 
-Interactive REPL — load a CSV, then type natural-language requests. Inside the session: `/help` lists commands, `/undo` reverts the last transformation, `exit` leaves.
+Interactive REPL — load a CSV, then type natural-language requests. Inside the session: `/help` lists commands, `/undo` reverts the last transformation, `/save <out.jsonl>` writes current rows to disk, `/save-flow <out.flow>` saves the current spec for later replay, `exit` leaves.
 
 ```
 bun packages/cli/src/index.ts test-cases/datanorm-input.csv
