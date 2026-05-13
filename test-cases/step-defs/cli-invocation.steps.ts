@@ -14,12 +14,7 @@ const capture = new WeakMap<TableTamerWorld, InvocationCapture>();
 
 function captureStdout(): { stream: Writable; text: () => string } {
   const chunks: string[] = [];
-  const stream = new Writable({
-    write(chunk, _enc, cb) {
-      chunks.push(chunk.toString());
-      cb();
-    },
-  });
+  const stream = new Writable({ write(chunk, _enc, cb) { chunks.push(chunk.toString()); cb(); } });
   return { stream, text: () => chunks.join('') };
 }
 
@@ -29,65 +24,44 @@ function getCapture(world: TableTamerWorld): InvocationCapture {
   return c;
 }
 
-When('user invokes {string}', async function (this: TableTamerWorld, command: string) {
+async function runAndCapture(world: TableTamerWorld, argv: string[], extra?: { stdin?: Readable }): Promise<void> {
+  const out = captureStdout();
+  const result = await runCli(argv, { stdout: out.stream, ...(extra?.stdin ? { stdin: extra.stdin } : {}) });
+  capture.set(world, { exitCode: result.exitCode, stdout: out.text(), stderr: result.stderr });
+}
+
+function tokenizeCmd(command: string): string[] {
   const tokens = command.trim().split(/\s+/);
-  if (tokens[0] !== 'tabletamer') {
-    throw new Error(`expected command to start with 'tabletamer', got: ${command}`);
-  }
-  const stdoutCap = captureStdout();
-  const result = await runCli(tokens.slice(1), { stdout: stdoutCap.stream });
-  capture.set(this, {
-    exitCode: result.exitCode,
-    stdout: stdoutCap.text(),
-    stderr: result.stderr,
-  });
+  if (tokens[0] !== 'tabletamer') throw new Error(`expected command to start with 'tabletamer', got: ${command}`);
+  return tokens.slice(1);
+}
+
+When('user invokes {string}', async function (this: TableTamerWorld, command: string) {
+  await runAndCapture(this, tokenizeCmd(command));
 });
 
-When(
-  'user enters the REPL with {string} and types:',
+When('user enters the REPL with {string} and types:',
   async function (this: TableTamerWorld, csv: string, lines: string) {
-    const fixture = `test-cases/${csv}`;
     const stdin = Readable.from([lines.endsWith('\n') ? lines : lines + '\n']);
-    const stdoutCap = captureStdout();
-    const result = await runCli([fixture], { stdin, stdout: stdoutCap.stream });
-    capture.set(this, {
-      exitCode: result.exitCode,
-      stdout: stdoutCap.text(),
-      stderr: result.stderr,
-    });
+    await runAndCapture(this, [`test-cases/${csv}`], { stdin });
   }
 );
 
-Then('exit code is {int}', function (this: TableTamerWorld, code: number) {
-  const inv = getCapture(this);
-  assert.equal(inv.exitCode, code, `expected exit code ${code}, got ${inv.exitCode}. stderr: ${inv.stderr}`);
-});
+function assertExitCode(world: TableTamerWorld, code: number, label = ''): void {
+  const inv = getCapture(world);
+  const prefix = label ? `${label} ` : '';
+  assert.equal(inv.exitCode, code, `expected ${prefix}exit code ${code}, got ${inv.exitCode}. stderr: ${inv.stderr}`);
+}
 
-Then('stdout contains {string}', function (this: TableTamerWorld, text: string) {
-  const inv = getCapture(this);
-  assert.ok(
-    inv.stdout.includes(text),
-    `stdout missing substring ${JSON.stringify(text)}. stdout was:\n${inv.stdout}`
-  );
-});
+function assertStreamContains(world: TableTamerWorld, stream: 'stdout' | 'stderr', text: string, label = ''): void {
+  const inv = getCapture(world);
+  const haystack = inv[stream];
+  assert.ok(haystack.includes(text),
+    `${label}${label ? ' ' : ''}${stream} missing substring ${JSON.stringify(text)}. ${stream} was:\n${haystack}`);
+}
 
-Then('stderr contains {string}', function (this: TableTamerWorld, text: string) {
-  const inv = getCapture(this);
-  assert.ok(
-    inv.stderr.includes(text),
-    `stderr missing substring ${JSON.stringify(text)}. stderr was:\n${inv.stderr}`
-  );
-});
-
-Then('REPL exit code is {int}', function (this: TableTamerWorld, code: number) {
-  const inv = getCapture(this);
-  assert.equal(inv.exitCode, code, `expected REPL exit code ${code}, got ${inv.exitCode}. stderr: ${inv.stderr}`);
-});
-
-Then('REPL stdout contains {string}', function (this: TableTamerWorld, text: string) {
-  const inv = getCapture(this);
-  assert.ok(
-    inv.stdout.includes(text),
-    `REPL stdout missing substring ${JSON.stringify(text)}. stdout was:\n${inv.stdout}`
-  );
-});
+Then('exit code is {int}',            function (this: TableTamerWorld, c: number) { assertExitCode(this, c); });
+Then('REPL exit code is {int}',       function (this: TableTamerWorld, c: number) { assertExitCode(this, c, 'REPL'); });
+Then('stdout contains {string}',      function (this: TableTamerWorld, t: string) { assertStreamContains(this, 'stdout', t); });
+Then('stderr contains {string}',      function (this: TableTamerWorld, t: string) { assertStreamContains(this, 'stderr', t); });
+Then('REPL stdout contains {string}', function (this: TableTamerWorld, t: string) { assertStreamContains(this, 'stdout', t, 'REPL'); });

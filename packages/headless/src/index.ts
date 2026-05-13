@@ -8,7 +8,6 @@ import {
   type Row,
   type Spec,
   type Transformation,
-  type Expr,
 } from '@tabletamer/core';
 
 export type ChunkUpdate = {
@@ -69,29 +68,6 @@ const DEFAULT_CHUNK_SIZE = Number(process.env.TABLETAMER_CHUNK_SIZE ?? 5);
 const DEFAULT_BATCH_SIZE = Number(process.env.TABLETAMER_BATCH_SIZE ?? 20);
 
 const BATCH_SYSTEM_PROMPT = `You will process several independent micro-tasks. Apply each task's instructions exactly to its own content. Return ONLY a JSON array of entries, one per task, in the same order as the tasks — no prose, no explanation, no markdown fences. Each entry is either a string (the per-task result) or the JSON literal null (when the per-task instructions say to reply null).`;
-
-const rateLimiter = (() => {
-  const timestamps: number[] = [];
-  let limit = DEFAULT_RPM;
-  return {
-    setLimit(rpm: number) {
-      if (rpm > 0 && rpm < limit) limit = rpm;
-    },
-    async acquire(signal?: AbortSignal): Promise<void> {
-      while (true) {
-        if (signal?.aborted) throw new Error('Runner: cancelled');
-        const now = Date.now();
-        while (timestamps.length && now - timestamps[0]! > 60_000) timestamps.shift();
-        if (timestamps.length < limit) {
-          timestamps.push(now);
-          return;
-        }
-        const waitMs = 60_000 - (now - timestamps[0]!);
-        await new Promise((r) => setTimeout(r, Math.min(waitMs, 1_000)));
-      }
-    },
-  };
-})();
 
 const SYSTEM_PROMPT = `You are TableTamer, an LLM that edits a JSON Spec describing transformations over a tabular dataset. The user describes a transformation in natural language; you reply by calling the apply_spec_patch tool with a list of RFC 6902 JSON Patch operations that mutate the current spec into the desired one. Do not call the tool more than once per turn. Do not reply with text — always use the tool.
 
@@ -159,6 +135,145 @@ const PATCH_INPUT_SCHEMA = jsonSchema<{ operations: unknown[] }>({
   additionalProperties: false,
 });
 
+const CANCELLED = 'Runner: cancelled';
+const ANTHROPIC_EPHEMERAL = { anthropic: { cacheControl: { type: 'ephemeral' as const } } };
+
+function abortIf(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new Error(CANCELLED);
+}
+
+function isCancelled(e: unknown): boolean {
+  return (e as Error)?.message === CANCELLED;
+}
+
+function compileJs(body: string): (row: Row, i: number, rows: Row[]) => unknown {
+  const src = body.trim();
+  try {
+    return new Function('row', 'i', 'rows', `return (${src});`) as (row: Row, i: number, rows: Row[]) => unknown;
+  } catch (e) {
+    throw new Error(`JS expression failed to compile: ${(e as Error).message} — body: ${src}`);
+  }
+}
+
+const rateLimiter = (() => {
+  const timestamps: number[] = [];
+  let limit = DEFAULT_RPM;
+  return {
+    setLimit(rpm: number) {
+      if (rpm > 0 && rpm < limit) limit = rpm;
+    },
+    async acquire(signal?: AbortSignal): Promise<void> {
+      while (true) {
+        abortIf(signal);
+        const now = Date.now();
+        while (timestamps.length && now - timestamps[0]! > 60_000) timestamps.shift();
+        if (timestamps.length < limit) {
+          timestamps.push(now);
+          return;
+        }
+        const waitMs = 60_000 - (now - timestamps[0]!);
+        await new Promise((r) => setTimeout(r, Math.min(waitMs, 1_000)));
+      }
+    },
+  };
+})();
+
+// ── Pure transformations ────────────────────────────────────────────────────
+
+function applyFilter(rows: Row[], t: Extract<Transformation, { kind: 'filter' }>): Row[] {
+  if (!('js' in t.pred)) throw new Error('filter: LLM predicates not supported in V1');
+  const fn = compileJs(t.pred.js);
+  return rows.filter((row, i) => Boolean(fn(row, i, rows)));
+}
+
+function applySelect(rows: Row[], t: Extract<Transformation, { kind: 'select' }>): Row[] {
+  return rows.map((row) => {
+    const out: Row = {};
+    for (const col of t.columns) out[col] = col in row ? row[col] : null;
+    return out;
+  });
+}
+
+function applySort(rows: Row[], t: Extract<Transformation, { kind: 'sort' }>): Row[] {
+  const keys = t.by.map((b) =>
+    typeof b.key === 'string'
+      ? (row: Row) => row[b.key as string]
+      : (compileJs((b.key as { js: string }).js) as (row: Row, i: number, rows: Row[]) => unknown)
+  );
+  const dirs = t.by.map((b) => (b.dir === 'desc' ? -1 : 1));
+  return rows
+    .map((row, i) => ({ row, i }))
+    .sort((a, b) => {
+      for (let k = 0; k < keys.length; k++) {
+        const av = keys[k]!(a.row, a.i, rows) as number | string;
+        const bv = keys[k]!(b.row, b.i, rows) as number | string;
+        if (av < bv) return -dirs[k]!;
+        if (av > bv) return dirs[k]!;
+      }
+      return 0;
+    })
+    .map((x) => x.row);
+}
+
+function applyMutateJs(rows: Row[], t: Extract<Transformation, { kind: 'mutate' }> & { value: { js: string } }): Row[] {
+  const cols = Array.isArray(t.columns) ? t.columns : [t.columns];
+  const fn = compileJs(t.value.js);
+  return rows.map((row, i) => {
+    const result = fn(row, i, rows);
+    const out: Row = { ...row };
+    if (cols.length === 1) out[cols[0]!] = result;
+    else if (result && typeof result === 'object')
+      for (const c of cols) out[c] = (result as Row)[c];
+    return out;
+  });
+}
+
+function renderPrompt(template: string, row: Row): string {
+  return template.replace(/\{([^{}]+)\}/g, (_, col) => {
+    const v = row[col];
+    return v === null || v === undefined ? '' : String(v);
+  });
+}
+
+function validateTemplate(template: string, rows: Row[]): void {
+  if (rows.length === 0) return;
+  const sample = rows[0]!;
+  for (const m of template.matchAll(/\{([^{}]+)\}/g)) {
+    const col = m[1]!;
+    if (!(col in sample)) {
+      throw new Error(`LLM template references column "${col}" which is not present in the data. Available columns: ${Object.keys(sample).join(', ')}.`);
+    }
+  }
+}
+
+// ── Prompt builders for the recovery loop ───────────────────────────────────
+
+function buildPrompt(text: string, spec: Spec, errPrefix?: string): string {
+  const specJson = JSON.stringify(spec, null, 2);
+  if (!errPrefix) return `Current spec:\n${specJson}\n\nUser request: ${text}`;
+  return `${errPrefix}\n\nCurrent spec:\n${specJson}\n\nOriginal user request: ${text}\n\nEmit a corrected patch.`;
+}
+
+type PatchAttempt = { kind: 'ok'; spec: Spec } | { kind: 'err'; message: string };
+
+function applyAndValidate(currentSpec: Spec, ops: unknown[]): PatchAttempt {
+  try {
+    if (ops.length === 0) {
+      return { kind: 'err', message: 'You called apply_spec_patch with an empty operations array. Emit at least one operation that fulfills the user request.' };
+    }
+    const patched = jsonpatch.applyPatch(structuredClone(currentSpec), ops as jsonpatch.Operation[], false, false).newDocument as unknown;
+    const validated = validateSpec(patched);
+    if (JSON.stringify(validated) === JSON.stringify(currentSpec)) {
+      return { kind: 'err', message: 'Your patch applied cleanly but left the spec identical to before. Emit operations that actually modify the spec to fulfill the user request.' };
+    }
+    return { kind: 'ok', spec: validated };
+  } catch (e) {
+    return { kind: 'err', message: (e as Error).message };
+  }
+}
+
+// ── Runner ─────────────────────────────────────────────────────────────────
+
 class HeadlessRunnerImpl implements HeadlessRunner {
   private opts: HeadlessRunnerOptions;
   private sourceRows: Row[] = [];
@@ -178,13 +293,15 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     if (process.env.TABLETAMER_RPM) rateLimiter.setLimit(Number(process.env.TABLETAMER_RPM));
   }
 
+  private requireLoaded(): void {
+    if (!this.loaded) throw new Error('Runner: no input loaded; call loadInput first.');
+  }
+
   private provider(): ReturnType<typeof createAnthropic> {
     if (this.providerCache) return this.providerCache;
     const apiKey = this.opts.apiKey ?? process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
-      throw new Error(
-        'ANTHROPIC_API_KEY is not set. Export it in your shell or pass `apiKey` to createHeadlessRunner().'
-      );
+      throw new Error('ANTHROPIC_API_KEY is not set. Export it in your shell or pass `apiKey` to createHeadlessRunner().');
     }
     const rawBase = this.opts.baseURL ?? process.env.ANTHROPIC_BASE_URL;
     const baseURL = rawBase
@@ -197,16 +314,12 @@ class HeadlessRunnerImpl implements HeadlessRunner {
   }
 
   private model(): ReturnType<ReturnType<typeof createAnthropic>> {
-    if (this.modelCache) return this.modelCache;
-    this.modelCache = this.provider()(this.opts.model ?? DEFAULT_MODEL);
-    return this.modelCache;
+    return (this.modelCache ??= this.provider()(this.opts.model ?? DEFAULT_MODEL));
   }
 
   private cellModel(perCellModel?: string): ReturnType<ReturnType<typeof createAnthropic>> {
     if (perCellModel) return this.provider()(perCellModel);
-    if (this.cellModelCache) return this.cellModelCache;
-    this.cellModelCache = this.provider()(this.opts.cellModel ?? DEFAULT_CELL_MODEL);
-    return this.cellModelCache;
+    return (this.cellModelCache ??= this.provider()(this.opts.cellModel ?? DEFAULT_CELL_MODEL));
   }
 
   async loadInput(path: string): Promise<void> {
@@ -219,26 +332,17 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     this.loaded = true;
   }
 
-  currentRows(): Row[] {
-    if (!this.loaded) throw new Error('Runner: no input loaded; call loadInput first.');
-    return this.derivedRows;
-  }
-
-  currentSpec(): Spec {
-    if (!this.loaded) throw new Error('Runner: no input loaded; call loadInput first.');
-    return this.spec;
-  }
+  currentRows(): Row[] { this.requireLoaded(); return this.derivedRows; }
+  currentSpec(): Spec { this.requireLoaded(); return this.spec; }
 
   async exportAs(path: string): Promise<void> {
-    if (!this.loaded) throw new Error('Runner: no input loaded; call loadInput first.');
+    this.requireLoaded();
     if (!path.endsWith('.jsonl')) throw new Error(`exportAs: V1 only supports .jsonl, got ${path}`);
     await writeJsonl(path, this.derivedRows, this.spec.columns.map((c) => c.id));
   }
 
   async setSpec(spec: Spec): Promise<void> {
     const validated = validateSpec(spec);
-    // Anchor spec.table to the loadInput'd source so downstream consumers
-    // (e.g. /save-flow) can always recover the CSV path.
     if (this.sourcePath) validated.table = this.sourcePath;
     const rows = await this.replay(validated, this.sourceRows, undefined, undefined);
     this.spec = validated;
@@ -246,73 +350,65 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     this.loaded = true;
   }
 
-  async request(text: string, callOpts: { signal?: AbortSignal; onChunk?: (u: ChunkUpdate) => void; onPlan?: (items: PlanItem[]) => void } = {}): Promise<void> {
-    if (!this.loaded) throw new Error('Runner: no input loaded; call loadInput first.');
+  async request(
+    text: string,
+    callOpts: { signal?: AbortSignal; onChunk?: (u: ChunkUpdate) => void; onPlan?: (items: PlanItem[]) => void } = {}
+  ): Promise<void> {
+    this.requireLoaded();
     if (this.busy) throw new Error('Runner: a request is already in progress.');
     this.busy = true;
     const signal = callOpts.signal ?? this.opts.signal;
     const onChunk = callOpts.onChunk ?? this.opts.onChunk;
     const onPlan = callOpts.onPlan ?? this.opts.onPlan;
-    const debugTurns: RequestDebugTurn[] = [];
+    const turns: RequestDebugTurn[] = [];
     try {
       const budget = this.opts.recoveryBudget ?? 3;
       let lastError: string | undefined;
-      let userPrompt = `Current spec:\n${JSON.stringify(this.spec, null, 2)}\n\nUser request: ${text}`;
-      for (let turn = 0; turn < budget; turn++) {
-        if (signal?.aborted) throw new Error('Runner: cancelled');
-        const ops = await this.callLlm(userPrompt, signal);
-        const turnLog: RequestDebugTurn = { ops, outcome: '' };
-        debugTurns.push(turnLog);
-        const attempt = (() => {
-          try {
-            if (ops.length === 0) {
-              return { kind: 'err' as const, message: 'You called apply_spec_patch with an empty operations array. Emit at least one operation that fulfills the user request.' };
-            }
-            const patched = jsonpatch.applyPatch(structuredClone(this.spec), ops as jsonpatch.Operation[], false, false).newDocument as unknown;
-            const validated = validateSpec(patched);
-            if (JSON.stringify(validated) === JSON.stringify(this.spec)) {
-              return { kind: 'err' as const, message: 'Your patch applied cleanly but left the spec identical to before. Emit operations that actually modify the spec to fulfill the user request.' };
-            }
-            return { kind: 'ok' as const, spec: validated };
-          } catch (e) {
-            return { kind: 'err' as const, message: (e as Error).message };
-          }
-        })();
-        if (attempt.kind === 'err') {
-          turnLog.outcome = 'rejected';
-          turnLog.sentBack = attempt.message;
-          lastError = attempt.message;
-          userPrompt = `Your previous patch failed: ${attempt.message}\n\nCurrent spec:\n${JSON.stringify(this.spec, null, 2)}\n\nOriginal user request: ${text}\n\nEmit a corrected patch.`;
+      let prompt = buildPrompt(text, this.spec);
+      for (let i = 0; i < budget; i++) {
+        abortIf(signal);
+        const ops = await this.callLlm(prompt, signal);
+        const turn: RequestDebugTurn = { ops, outcome: '' };
+        turns.push(turn);
+
+        const tried = applyAndValidate(this.spec, ops);
+        if (tried.kind === 'err') {
+          turn.outcome = 'rejected';
+          turn.sentBack = tried.message;
+          lastError = tried.message;
+          prompt = buildPrompt(text, this.spec, `Your previous patch failed: ${tried.message}`);
           continue;
         }
+
         if (onPlan) {
-          const plan = computePlan(this.spec, attempt.spec);
-          if (plan.length > 0) onPlan(plan);
+          const plan = computePlan(this.spec, tried.spec);
+          if (plan.length) onPlan(plan);
         }
+
         try {
-          const newRows = await this.replay(attempt.spec, this.sourceRows, signal, onChunk);
-          if (signal?.aborted) throw new Error('Runner: cancelled');
-          this.spec = attempt.spec;
+          const newRows = await this.replay(tried.spec, this.sourceRows, signal, onChunk);
+          abortIf(signal);
+          this.spec = tried.spec;
           this.derivedRows = newRows;
-          turnLog.outcome = 'committed';
+          turn.outcome = 'committed';
           return;
         } catch (e) {
-          if (signal?.aborted || (e as Error).message === 'Runner: cancelled') throw new Error('Runner: cancelled');
-          turnLog.outcome = `evaluation failed: ${(e as Error).message}`;
+          if (signal?.aborted || isCancelled(e)) throw new Error(CANCELLED);
           lastError = (e as Error).message;
-          turnLog.sentBack = `evaluation error: ${lastError}`;
-          userPrompt = `Your previous patch applied but evaluation failed: ${lastError}\n\nCurrent spec:\n${JSON.stringify(this.spec, null, 2)}\n\nOriginal user request: ${text}\n\nEmit a corrected patch.`;
+          turn.outcome = `evaluation failed: ${lastError}`;
+          turn.sentBack = `evaluation error: ${lastError}`;
+          prompt = buildPrompt(text, this.spec, `Your previous patch applied but evaluation failed: ${lastError}`);
         }
       }
       const err = new Error(`Runner: recovery budget exhausted${lastError ? `; last error: ${lastError}` : ''}`);
-      (err as Error & { debug?: RequestDebugInfo }).debug = { userRequest: text, turns: debugTurns };
+      (err as Error & { debug?: RequestDebugInfo }).debug = { userRequest: text, turns };
       throw err;
     } finally {
       this.busy = false;
     }
   }
 
-  private async callLlm(userPrompt: string, signal?: AbortSignal): Promise<unknown[]> {
+  private async callLlm(prompt: string, signal?: AbortSignal): Promise<unknown[]> {
     let captured: unknown[] | undefined;
     const applySpecPatch = tool({
       description: 'Apply RFC 6902 JSON Patch operations to the current spec.',
@@ -326,22 +422,19 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     const result = await generateText({
       model: this.model(),
       system: SYSTEM_PROMPT,
-      prompt: userPrompt,
+      prompt,
       tools: { apply_spec_patch: applySpecPatch },
       toolChoice: { type: 'tool', toolName: 'apply_spec_patch' },
       stopWhen: stepCountIs(2),
       abortSignal: signal,
       temperature: 0,
       maxRetries: this.opts.maxRetries ?? DEFAULT_MAX_RETRIES,
-      providerOptions: {
-        anthropic: { cacheControl: { type: 'ephemeral' } },
-      },
+      providerOptions: ANTHROPIC_EPHEMERAL,
     });
     if (!captured) {
       const direct = result.toolCalls?.find((c) => c.toolName === 'apply_spec_patch');
-      if (direct && (direct.input as { operations?: unknown[] })?.operations) {
-        captured = (direct.input as { operations: unknown[] }).operations;
-      }
+      const ops = (direct?.input as { operations?: unknown[] } | undefined)?.operations;
+      if (ops) captured = ops;
     }
     if (!captured) throw new Error(`LLM did not call apply_spec_patch; returned text: ${result.text?.slice(0, 200) ?? '<empty>'}`);
     return captured;
@@ -353,27 +446,30 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     signal: AbortSignal | undefined,
     onChunk: ((u: ChunkUpdate) => void) | undefined
   ): Promise<Row[]> {
-    let startIndex = 0;
+    const prev = this.spec.transformations;
+    const next = spec.transformations;
+    const reuseDerivedAsPrefix =
+      next.length >= prev.length &&
+      this.derivedRows.length > 0 &&
+      prev.every((p, i) => JSON.stringify(p) === JSON.stringify(next[i]));
+
     let rows: Row[];
-    const prevTransformations = this.spec.transformations;
-    const prefixMatches =
-      spec.transformations.length >= prevTransformations.length &&
-      prevTransformations.every((p, i) => JSON.stringify(p) === JSON.stringify(spec.transformations[i]));
-    if (prefixMatches && this.derivedRows.length > 0) {
+    let start: number;
+    if (reuseDerivedAsPrefix) {
       rows = this.derivedRows.map((r) => ({ ...r }));
-      startIndex = prevTransformations.length;
+      start = prev.length;
     } else {
       rows = sourceRows.map((r) => ({ ...r }));
+      start = 0;
     }
-    for (let tIndex = startIndex; tIndex < spec.transformations.length; tIndex++) {
-      const t = spec.transformations[tIndex] as Transformation;
-      if (signal?.aborted) throw new Error('Runner: cancelled');
-      rows = await this.applyTransformation(rows, t, tIndex, signal, onChunk);
+    for (let i = start; i < next.length; i++) {
+      abortIf(signal);
+      rows = await this.applyT(rows, next[i] as Transformation, i, signal, onChunk);
     }
     return rows;
   }
 
-  private async applyTransformation(
+  private async applyT(
     rows: Row[],
     t: Transformation,
     tIndex: number,
@@ -381,104 +477,61 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     onChunk: ((u: ChunkUpdate) => void) | undefined
   ): Promise<Row[]> {
     switch (t.kind) {
-      case 'filter': {
-        const fn = compileJsPredicate(t.pred, ['row', 'i', 'rows']);
-        const out: Row[] = [];
-        for (let i = 0; i < rows.length; i++) {
-          if (fn(rows[i], i, rows)) out.push(rows[i]!);
-        }
-        return out;
-      }
-      case 'select': {
-        return rows.map((row) => {
-          const out: Row = {};
-          for (const col of t.columns) out[col] = col in row ? row[col] : null;
-          return out;
-        });
-      }
-      case 'sort': {
-        const keys: Array<(row: Row, i: number, rows: Row[]) => unknown> = t.by.map((b) =>
-          typeof b.key === 'string'
-            ? ((row: Row) => row[b.key as string])
-            : (compileJsPredicate(b.key, ['row', 'i', 'rows']) as (row: Row, i: number, rows: Row[]) => unknown)
-        );
-        const dirs = t.by.map((b) => (b.dir === 'desc' ? -1 : 1));
-        return rows
-          .map((row, i) => ({ row, i }))
-          .sort((a, b) => {
-            for (let k = 0; k < keys.length; k++) {
-              const av = keys[k]!(a.row, a.i, rows) as number | string;
-              const bv = keys[k]!(b.row, b.i, rows) as number | string;
-              if (av < bv) return -dirs[k]!;
-              if (av > bv) return dirs[k]!;
-            }
-            return 0;
-          })
-          .map((x) => x.row);
-      }
-      case 'mutate': {
-        const cols = Array.isArray(t.columns) ? t.columns : [t.columns];
-        if ('js' in t.value) {
-          const fn = compileJsPredicate(t.value, ['row', 'i', 'rows']);
-          return rows.map((row, i) => {
-            const result = fn(row, i, rows);
-            const out: Row = { ...row };
-            if (cols.length === 1) out[cols[0]!] = result;
-            else if (result && typeof result === 'object')
-              for (const c of cols) out[c] = (result as Row)[c];
-            return out;
-          });
-        }
-        // llm mutate
-        const template = t.value.llm;
-        const perCellModel = t.value.model;
-        validateTemplate(template, rows);
-        const batchSize = Math.max(1, this.opts.batchSize ?? DEFAULT_BATCH_SIZE);
-        const chunkSize = Math.max(1, this.opts.chunkSize ?? DEFAULT_CHUNK_SIZE);
-        const out: Row[] = rows.map((r) => ({ ...r }));
-        const batches: Array<{ start: number; rows: Row[] }> = [];
-        for (let i = 0; i < rows.length; i += batchSize) {
-          batches.push({ start: i, rows: rows.slice(i, i + batchSize) });
-        }
-        for (let g = 0; g < batches.length; g += chunkSize) {
-          if (signal?.aborted) throw new Error('Runner: cancelled');
-          const group = batches.slice(g, g + chunkSize);
-          const groupResults = await Promise.all(
-            group.map((b) => this.evalLlmBatch(template, b.rows, perCellModel, signal))
-          );
-          if (signal?.aborted) throw new Error('Runner: cancelled');
-          for (let gi = 0; gi < group.length; gi++) {
-            const b = group[gi]!;
-            const results = groupResults[gi]!;
-            for (let j = 0; j < b.rows.length; j++) {
-              const value = results[j];
-              const rowIndex = b.start + j;
-              for (const c of cols) {
-                const before = out[rowIndex]![c];
-                out[rowIndex]![c] = value;
-                if (onChunk) onChunk({ transformationIndex: tIndex, rowIndex, column: c, before, after: value });
-              }
-            }
-          }
-          // yield to the event loop so a pending abort.abort() in the test harness
-          // is observed before the next chunk starts.
-          await new Promise((r) => setTimeout(r, 0));
-        }
-        return out;
-      }
+      case 'filter': return applyFilter(rows, t);
+      case 'select': return applySelect(rows, t);
+      case 'sort':   return applySort(rows, t);
+      case 'mutate':
+        if ('js' in t.value) return applyMutateJs(rows, t as typeof t & { value: { js: string } });
+        return this.applyMutateLlm(rows, t as typeof t & { value: { llm: string; model?: string } }, tIndex, signal, onChunk);
     }
   }
 
-  private renderPrompt(template: string, row: Row): string {
-    return template.replace(/\{([^{}]+)\}/g, (_, col) => {
-      const v = row[col];
-      return v === null || v === undefined ? '' : String(v);
-    });
+  private async applyMutateLlm(
+    rows: Row[],
+    t: Extract<Transformation, { kind: 'mutate' }> & { value: { llm: string; model?: string } },
+    tIndex: number,
+    signal: AbortSignal | undefined,
+    onChunk: ((u: ChunkUpdate) => void) | undefined
+  ): Promise<Row[]> {
+    const cols = Array.isArray(t.columns) ? t.columns : [t.columns];
+    const template = t.value.llm;
+    const perCellModel = t.value.model;
+    validateTemplate(template, rows);
+    const batchSize = Math.max(1, this.opts.batchSize ?? DEFAULT_BATCH_SIZE);
+    const chunkSize = Math.max(1, this.opts.chunkSize ?? DEFAULT_CHUNK_SIZE);
+    const out: Row[] = rows.map((r) => ({ ...r }));
+    const batches: Array<{ start: number; rows: Row[] }> = [];
+    for (let i = 0; i < rows.length; i += batchSize) {
+      batches.push({ start: i, rows: rows.slice(i, i + batchSize) });
+    }
+    for (let g = 0; g < batches.length; g += chunkSize) {
+      abortIf(signal);
+      const group = batches.slice(g, g + chunkSize);
+      const groupResults = await Promise.all(
+        group.map((b) => this.evalLlmBatch(template, b.rows, perCellModel, signal))
+      );
+      abortIf(signal);
+      for (let gi = 0; gi < group.length; gi++) {
+        const b = group[gi]!;
+        const results = groupResults[gi]!;
+        for (let j = 0; j < b.rows.length; j++) {
+          const value = results[j];
+          const rowIndex = b.start + j;
+          for (const c of cols) {
+            const before = out[rowIndex]![c];
+            out[rowIndex]![c] = value;
+            onChunk?.({ transformationIndex: tIndex, rowIndex, column: c, before, after: value });
+          }
+        }
+      }
+      // yield so a pending abort.abort() is observed before the next chunk starts.
+      await new Promise((r) => setTimeout(r, 0));
+    }
+    return out;
   }
 
   private cacheKey(perCellModel: string | undefined, prompt: string): string {
-    const modelName = perCellModel ?? this.opts.cellModel ?? DEFAULT_CELL_MODEL;
-    return `${modelName} ${prompt}`;
+    return `${perCellModel ?? this.opts.cellModel ?? DEFAULT_CELL_MODEL} ${prompt}`;
   }
 
   private async evalLlmBatch(
@@ -488,59 +541,42 @@ class HeadlessRunnerImpl implements HeadlessRunner {
     signal?: AbortSignal
   ): Promise<unknown[]> {
     if (rows.length === 0) return [];
-    const prompts = rows.map((r) => this.renderPrompt(template, r));
+    const prompts = rows.map((r) => renderPrompt(template, r));
     const results: unknown[] = new Array(rows.length);
-    const pendingIdx: number[] = [];
-    const pendingPrompts: string[] = [];
+    const pending: { idx: number; prompt: string }[] = [];
     for (let i = 0; i < prompts.length; i++) {
       const key = this.cacheKey(perCellModel, prompts[i]!);
-      if (this.cellResultCache.has(key)) {
-        results[i] = this.cellResultCache.get(key);
-      } else {
-        pendingIdx.push(i);
-        pendingPrompts.push(prompts[i]!);
-      }
+      if (this.cellResultCache.has(key)) results[i] = this.cellResultCache.get(key);
+      else pending.push({ idx: i, prompt: prompts[i]! });
     }
-    if (pendingPrompts.length === 0) return results;
-    const fetched = await this.callLlmBatch(pendingPrompts, perCellModel, signal);
-    for (let k = 0; k < pendingIdx.length; k++) {
-      const val = fetched[k];
-      const idx = pendingIdx[k]!;
-      results[idx] = val;
-      this.cellResultCache.set(this.cacheKey(perCellModel, pendingPrompts[k]!), val);
+    if (pending.length === 0) return results;
+    const fetched = await this.callLlmCells(pending.map((p) => p.prompt), perCellModel, signal);
+    for (let k = 0; k < pending.length; k++) {
+      results[pending[k]!.idx] = fetched[k];
+      this.cellResultCache.set(this.cacheKey(perCellModel, pending[k]!.prompt), fetched[k]);
     }
     return results;
   }
 
-  private async callLlmBatch(
-    prompts: string[],
-    perCellModel: string | undefined,
-    signal?: AbortSignal
-  ): Promise<unknown[]> {
+  private async callLlmCells(prompts: string[], perCellModel: string | undefined, signal?: AbortSignal): Promise<unknown[]> {
     if (prompts.length === 0) return [];
-    if (prompts.length === 1) return [await this.callLlmOnce(prompts[0]!, perCellModel, signal)];
-    const userMessage = prompts.map((p, i) => `[${i + 1}]\n${p}`).join('\n\n---\n\n');
+    if (prompts.length === 1) return [await this.callLlmCell(prompts[0]!, perCellModel, signal)];
     await rateLimiter.acquire(signal);
     const result = await generateText({
       model: this.cellModel(perCellModel),
       system: BATCH_SYSTEM_PROMPT,
-      prompt: userMessage,
+      prompt: prompts.map((p, i) => `[${i + 1}]\n${p}`).join('\n\n---\n\n'),
       abortSignal: signal,
       temperature: 0,
       maxRetries: this.opts.maxRetries ?? DEFAULT_MAX_RETRIES,
-      providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
+      providerOptions: ANTHROPIC_EPHEMERAL,
     });
     const parsed = tryParseBatchResponse(result.text ?? '', prompts.length);
     if (parsed) return parsed;
-    // Fallback: per-cell, in parallel.
-    return Promise.all(prompts.map((p) => this.callLlmOnce(p, perCellModel, signal)));
+    return Promise.all(prompts.map((p) => this.callLlmCell(p, perCellModel, signal)));
   }
 
-  private async callLlmOnce(
-    prompt: string,
-    perCellModel: string | undefined,
-    signal?: AbortSignal
-  ): Promise<unknown> {
+  private async callLlmCell(prompt: string, perCellModel: string | undefined, signal?: AbortSignal): Promise<unknown> {
     await rateLimiter.acquire(signal);
     const result = await generateText({
       model: this.cellModel(perCellModel),
@@ -548,11 +584,10 @@ class HeadlessRunnerImpl implements HeadlessRunner {
       abortSignal: signal,
       temperature: 0,
       maxRetries: this.opts.maxRetries ?? DEFAULT_MAX_RETRIES,
-      providerOptions: { anthropic: { cacheControl: { type: 'ephemeral' } } },
+      providerOptions: ANTHROPIC_EPHEMERAL,
     });
     const text = (result.text ?? '').trim();
-    if (text === '' || text.toLowerCase() === 'null') return null;
-    return text;
+    return text === '' || text.toLowerCase() === 'null' ? null : text;
   }
 }
 
@@ -572,16 +607,9 @@ export function computePlan(oldSpec: Spec, newSpec: Spec): PlanItem[] {
   const oldT = oldSpec.transformations;
   const newT = newSpec.transformations;
   let prefix = 0;
-  while (
-    prefix < oldT.length &&
-    prefix < newT.length &&
-    JSON.stringify(oldT[prefix]) === JSON.stringify(newT[prefix])
-  )
-    prefix++;
-  for (let i = prefix; i < oldT.length; i++)
-    items.push({ kind: 'remove-transformation', transformation: oldT[i] as Transformation });
-  for (let i = prefix; i < newT.length; i++)
-    items.push({ kind: 'add-transformation', transformation: newT[i] as Transformation });
+  while (prefix < oldT.length && prefix < newT.length && JSON.stringify(oldT[prefix]) === JSON.stringify(newT[prefix])) prefix++;
+  for (let i = prefix; i < oldT.length; i++) items.push({ kind: 'remove-transformation', transformation: oldT[i] as Transformation });
+  for (let i = prefix; i < newT.length; i++) items.push({ kind: 'add-transformation', transformation: newT[i] as Transformation });
   return items;
 }
 
@@ -604,27 +632,6 @@ export function tryParseBatchResponse(text: string, expectedLen: number): unknow
     });
   } catch {
     return undefined;
-  }
-}
-
-function validateTemplate(template: string, rows: Row[]): void {
-  const matches = [...template.matchAll(/\{([^{}]+)\}/g)].map((m) => m[1]!);
-  if (rows.length === 0) return;
-  const sample = rows[0]!;
-  for (const col of matches) {
-    if (!(col in sample)) {
-      throw new Error(`LLM template references column "${col}" which is not present in the data. Available columns: ${Object.keys(sample).join(', ')}.`);
-    }
-  }
-}
-
-function compileJsPredicate(expr: Expr, args: string[]): (...a: unknown[]) => unknown {
-  if (!('js' in expr)) throw new Error('compileJsPredicate: expected {js} expression');
-  const body = expr.js.trim();
-  try {
-    return new Function(...args, `return (${body});`) as (...a: unknown[]) => unknown;
-  } catch (e) {
-    throw new Error(`JS expression failed to compile: ${(e as Error).message} — body: ${body}`);
   }
 }
 
