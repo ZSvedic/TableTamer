@@ -4,15 +4,33 @@ A CLI ETL tool you drive with natural language. Load a CSV, type *"normalize pho
 
 V1 ships a terminal CLI and a headless library. A web UI is V2.
 
+## Project layout
+
+The repo is organized by **lifecycle**, not by file type:
+
+```
+ops/      How the project is built: prompts, phase backlogs, status reports,
+          repo-tracking scripts, conventions, research notes. Never deployed.
+spec/     The contract: *.md specs + test-cases/ (Gherkin features + fixtures).
+          Human-authored / human-blessed.
+src/      The implementation. Self-contained, deployable unit — it carries its
+          own package.json, bun.lock, node_modules/. Run bun from here.
+          src/packages/  — core / headless / cli (regenerable from spec/*.md)
+          src/tests/     — cucumber step definitions (regenerable from Gherkin)
+temp/     Scratch: generated outputs, charts, logs. Gitignored, deletable.
+```
+
+Root holds only `README.md`, `LICENSE`, `.gitignore`. Everything build-related lives in `src/`, so **all `bun` commands run from `src/`**. Conventions for the stack and the dev process are in [ops/conventions.md](ops/conventions.md).
+
 ## Setup
 
 You need [bun](https://bun.sh) and an Anthropic API key.
 
-1. Install dependencies:
+1. Install dependencies (from `src/`, where `package.json` lives):
    ```
-   bun install
+   cd src && bun install
    ```
-2. Put your API key in a `.env` file at the repo root:
+2. Put your API key in a `.env` file at the repo root (the loader walks up from `src/` to find it):
    ```
    ANTHROPIC_API_KEY=sk-ant-...
    ```
@@ -33,7 +51,7 @@ Optional env vars and defaults if you omit them:
 Interactive REPL — load a CSV, then type natural-language requests. Inside the session: `/help` lists commands, `/undo` reverts the last transformation, `/save <out.jsonl>` writes current rows to disk, `/save-flow <out.flow>` saves the current spec for later replay, `exit` leaves.
 
 ```
-bun packages/cli/src/index.ts test-cases/datanorm-input.csv
+bun src/packages/cli/index.ts spec/test-cases/datanorm-input.csv
 ```
 
 ```
@@ -53,34 +71,37 @@ Ctrl-C cancels an in-progress request and rolls back the half-applied transforma
 Batch mode — replay a saved `.flow` against a CSV with no LLM call:
 
 ```
-bun packages/cli/src/index.ts execute test-cases/datanorm.flow \
-    --input test-cases/datanorm-input.csv \
-    --output /tmp/out.jsonl
+bun src/packages/cli/index.ts execute spec/test-cases/datanorm.flow \
+    --input spec/test-cases/datanorm-input.csv \
+    --output temp/out.jsonl
 ```
 
 Exit codes are documented in [spec/cli.md](spec/cli.md).
 
 ## Run the tests
 
-```
-bun run test
-```
-
-That runs both cucumber profiles (`headless` then `cli`) over the four V1 features. For per-profile commands, filtering by feature or scenario name, and the type-only fast check, see [TESTING.md](TESTING.md).
-
-## Project layout
+All test commands run from `src/`.
 
 ```
-packages/
-  core/         # types, validation, .env loader, CSV/JSONL I/O
-  headless/     # LLM harness — turns requests into spec patches
-  cli/          # REPL + `execute` subcommand on top of headless
-spec/           # API spec (hub at spec/spec.md)
-phases/         # phase-1..4 audit trail
-test-cases/     # .feature files, fixtures, step definitions
+cd src
+bun run test          # both cucumber profiles (headless then cli) over the V1 features
+bun run test:offline  # bun unit tests + the @offline cucumber subset (no LLM, no API key)
 ```
 
-Conventions for the stack and the dev process are in [conventions.md](conventions.md).
+`bun run test` runs `--profile headless` then `--profile cli`; the final exit code is from the `cli` profile. The `@offline` subset (CLI flags + REPL slash commands) and the bun unit tests need no API key.
+
+Narrower runs, layered on top of any of the above:
+
+```
+bun x cucumber-js --profile headless                          # @headless scenarios only
+bun x cucumber-js --profile cli                               # @cli scenarios only
+bun x cucumber-js --profile cli --name "Drop duplicates"      # match scenario name substring
+bun x cucumber-js ../spec/test-cases/dedupe.feature           # one feature file
+bun x tsc --noEmit && echo "passed"                           # fast type-only check
+bun test                                                      # bun unit tests only
+```
+
+The `headless` profile binds `createHeadlessRunner` from `@tabletamer/headless`; the `cli` profile binds `createCliRunner` / `runCli` from `@tabletamer/cli`. Both cover [datanorm](spec/test-cases/datanorm.feature), [dedupe](spec/test-cases/dedupe.feature), [filter](spec/test-cases/filter.feature), and [cancelation](spec/test-cases/cancelation.feature); the `cli` profile also covers [cli-flags](spec/test-cases/cli-flags.feature) and [repl-commands](spec/test-cases/repl-commands.feature).
 
 ## Known limitations
 

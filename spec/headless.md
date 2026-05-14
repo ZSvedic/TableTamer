@@ -2,7 +2,7 @@
 
 Headless owns the LLM harness: it turns natural-language requests into spec patches, runs the transformations against the source rows, and lets the user watch progress chunk by chunk and cancel a slow operation. It doesn't print to a terminal, manage processes, or read and write files (beyond calling core's I/O); `createHeadlessRunner()` returns a Runner that step definitions drive directly and that the CLI wraps for its REPL.
 
-The harness is built from scratch on top of the Vercel AI SDK ([phase-1-pre-spec.md Q11](../phases/phase-1-pre-spec.md)). There's no rolling chat history: each request is a fresh turn whose only context is the cached system prompt and the current spec — about 1 KB per turn, no matter how big the table is or how many requests have come before ([data-model.md](data-model.md#per-turn-token-budget)).
+The harness is built from scratch on top of the Vercel AI SDK ([phase-1-pre-spec.md Q11](../ops/phases/phase-1-pre-spec.md)). There's no rolling chat history: each request is a fresh turn whose only context is the cached system prompt and the current spec — about 1 KB per turn, no matter how big the table is or how many requests have come before ([data-model.md](data-model.md#per-turn-token-budget)).
 
 ## Example turn
 
@@ -36,7 +36,7 @@ The `apply_spec_patch` tool takes a list of JSON Patch operations (RFC 6902). Th
 
 The transformation evaluator runs `spec.transformations` against the immutable source. A JS expression compiles with `new Function` using the `(row, index, allRows)` signature. An LLM expression hands off to the chunk dispatcher.
 
-The chunk dispatcher splits rows into **batches** (N rendered prompts shipped in one LLM request, default 20) and runs several batches as a **chunk** in parallel (default 5). The terms are independent: `TABLETAMER_BATCH_SIZE` controls how many rows ride in one request; `TABLETAMER_CHUNK_SIZE` controls how many requests fire concurrently. A per-session cache keyed by `(model, rendered prompt)` short-circuits duplicate inputs before they ever reach a batch. Progress and the cancel `AbortSignal` flow through cleanly ([phase-1-pre-spec.md Q10](../phases/phase-1-pre-spec.md)).
+The chunk dispatcher splits rows into **batches** (N rendered prompts shipped in one LLM request, default 20) and runs several batches as a **chunk** in parallel (default 5). The terms are independent: `TABLETAMER_BATCH_SIZE` controls how many rows ride in one request; `TABLETAMER_CHUNK_SIZE` controls how many requests fire concurrently. A per-session cache keyed by `(model, rendered prompt)` short-circuits duplicate inputs before they ever reach a batch. Progress and the cancel `AbortSignal` flow through cleanly ([phase-1-pre-spec.md Q10](../ops/phases/phase-1-pre-spec.md)).
 
 The batch protocol uses a stable system prompt (cached) telling the model to return a JSON array, plus a user message containing each rendered task numbered `[1]`, `[2]`, …. The model replies with a JSON array of strings or nulls in input order. If the reply isn't a JSON array of the expected length (parse failure, wrong shape, length mismatch), the dispatcher falls back to per-row calls for that batch — slower, but always correct.
 
@@ -44,7 +44,7 @@ The error feedback loop catches Zod validation failures, query failures (a JS ex
 
 ## System prompt
 
-The cacheable prefix is about 600 tokens, marked with `cache_control: { type: 'ephemeral' }` on the Anthropic provider ([phase-1-pre-spec.md Q14](../phases/phase-1-pre-spec.md)):
+The cacheable prefix is about 600 tokens, marked with `cache_control: { type: 'ephemeral' }` on the Anthropic provider ([phase-1-pre-spec.md Q14](../ops/phases/phase-1-pre-spec.md)):
 
 | Section | Tokens | Source |
 |---|---|---|

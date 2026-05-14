@@ -1,6 +1,7 @@
 node_modules/
+temp/*
+!temp/.gitkeep
 *-output.*
-*.png
 .DS_Store
 .env
 .env.local

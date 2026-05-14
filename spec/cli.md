@@ -2,7 +2,7 @@
 
 The CLI is two things on top of headless: an interactive REPL where the user types natural-language requests, and a `tabletamer execute <flow>` command that re-runs a saved spec against a CSV. Both print ASCII tables to stdout and pass every real decision — what the spec looks like, what a transformation does, what counts as valid — down to the headless runner.
 
-Per [phase-1-pre-spec.md Q1](../phases/phase-1-pre-spec.md), the REPL prints a fresh view each turn and never uses terminal control codes. Think `sqlite3` or `jq`, not vim.
+Per [phase-1-pre-spec.md Q1](../ops/phases/phase-1-pre-spec.md), the REPL prints a fresh view each turn and never uses terminal control codes. Think `sqlite3` or `jq`, not vim.
 
 ## Interactive example
 
@@ -54,7 +54,7 @@ Options forward to `createHeadlessRunner`. By default the runner writes to `proc
 
 ## `runCli(argv)`
 
-The process-level entry point. It returns `{ exitCode, stderr }` instead of calling `process.exit`, so callers can decide what to do with a failure — the step in [common.steps.ts](../test-cases/step-defs/common.steps.ts) reads the exit code directly. `--help`, `-h`, and `help` print a usage screen to stdout and exit 0. With no subcommand, `runCli` starts the REPL; with `execute <flow>`, it runs the batch path:
+The process-level entry point. It returns `{ exitCode, stderr }` instead of calling `process.exit`, so callers can decide what to do with a failure — the step in [common.steps.ts](../src/tests/common.steps.ts) reads the exit code directly. `--help`, `-h`, and `help` print a usage screen to stdout and exit 0. With no subcommand, `runCli` starts the REPL; with `execute <flow>`, it runs the batch path:
 
 ```
 flow    = readJson(<flow>)        # parse + Zod-validate
@@ -64,7 +64,7 @@ runner.setSpec(flow.spec)         # replays transformations against the source
 runner.exportAs(--output)
 ```
 
-No LLM call happens on this path ([phase-1-pre-spec.md Q15](../phases/phase-1-pre-spec.md)).
+No LLM call happens on this path ([phase-1-pre-spec.md Q15](../ops/phases/phase-1-pre-spec.md)).
 
 | Exit | Meaning |
 |---|---|
@@ -78,7 +78,7 @@ No LLM call happens on this path ([phase-1-pre-spec.md Q15](../phases/phase-1-pr
 
 ## `.flow` format
 
-V1 takes Option A from [phase-1-pre-spec.md Q15](../phases/phase-1-pre-spec.md): a JSON file with the source path and the spec.
+V1 takes Option A from [phase-1-pre-spec.md Q15](../ops/phases/phase-1-pre-spec.md): a JSON file with the source path and the spec.
 
 ```json
 {

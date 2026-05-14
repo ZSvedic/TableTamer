@@ -2,7 +2,7 @@
 
 Runner is the object step definitions drive. The CLI package and the headless package both make Runners; the methods are identical, only what each one does under the hood differs.
 
-Step definitions in [common.steps.ts](../test-cases/step-defs/common.steps.ts) get a Runner from `world.ensureRunner()`, then call six methods on it: `loadInput`, `request`, `setSpec`, `currentRows`, `currentSpec`, `exportAs`. The Runner holds the spec, runs the transformations against the source rows, and only commits new state when a request finishes cleanly.
+Step definitions in [common.steps.ts](../src/tests/common.steps.ts) get a Runner from `world.ensureRunner()`, then call six methods on it: `loadInput`, `request`, `setSpec`, `currentRows`, `currentSpec`, `exportAs`. The Runner holds the spec, runs the transformations against the source rows, and only commits new state when a request finishes cleanly.
 
 ## Example
 
@@ -71,9 +71,9 @@ The source rows from `loadCsv` never change. What changes is `spec.transformatio
 
 Cancel comes in through the surface — `AbortSignal` on headless, Ctrl+C on CLI. The Runner then:
 
-1. Stops sending out new chunks, within 2 seconds ([cancelation.feature](../test-cases/cancelation.feature)).
+1. Stops sending out new chunks, within 2 seconds ([cancelation.feature](test-cases/cancelation.feature)).
 2. Waits for chunks already in progress to come back.
 3. Removes the half-applied transformation from the spec ([data-model.md](data-model.md#failure-recovery)).
 4. Throws `Runner: cancelled`.
 
-Anything committed before the cancel stays put — the third scenario in [cancelation.feature](../test-cases/cancelation.feature) is the contract.
+Anything committed before the cancel stays put — the third scenario in [cancelation.feature](test-cases/cancelation.feature) is the contract.

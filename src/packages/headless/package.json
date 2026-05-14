@@ -1,0 +1,17 @@
+{
+  "name": "@tabletamer/headless",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "index.ts",
+  "types": "index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.74",
+    "@tabletamer/core": "workspace:*",
+    "ai": "^6.0.174",
+    "fast-json-patch": "^3.1.1"
+  }
+}

@@ -31,7 +31,7 @@ V1 keeps four pure verbs and two expression shapes; everything else is V2.
 - `Expr` is either `{ js: string }` or `{ llm: string; model?: string }`. `{ sql }` is V2.
 - `Spec.summary.groupBy` and `Spec.summary.aggregates` are accepted only as empty arrays, so V2 specs that fill them can still parse here.
 
-A JS expression is the body of an arrow function with signature `(row, index, allRows) => result` ([phase-1-pre-spec.md Q13](../phases/phase-1-pre-spec.md)). The runtime wraps it as `return (<body>)` and compiles it once.
+A JS expression is the body of an arrow function with signature `(row, index, allRows) => result` ([phase-1-pre-spec.md Q13](../ops/phases/phase-1-pre-spec.md)). The runtime wraps it as `return (<body>)` and compiles it once.
 
 An LLM expression is a prompt template with `{Column}` placeholders. The runtime renders one prompt per row by substituting `{Column}` for that row's value, then batches multiple rendered prompts into a single LLM call (default 20 rows per call) that replies with a JSON array of results — see [headless.md](headless.md) for the batch protocol. Identical rendered prompts hit a per-session cache, so duplicate inputs cost nothing after the first. A placeholder that doesn't match any column is an error, and the recovery loop in [runner.md](runner.md) feeds the error back to the LLM.
 
@@ -39,7 +39,7 @@ An LLM expression is a prompt template with `{Column}` placeholders. The runtime
 
 `loadCsv(path)` reads a CSV with `csv-parse` and builds the initial spec: `columns[]` taken from the header in order, an empty `transformations`, no filter or sort yet. Every value stays a string — the runtime doesn't try to guess whether a value is a number or a date; that's the LLM's job via a `mutate` transformation. A missing header, a duplicate column id, or an unreadable file throws an error that includes the file path.
 
-`readJsonl(path)` reads one JSON object per line. Blank lines are skipped, a malformed line throws an error that names the line number, and an empty file returns an empty array. Step definitions use this to compare current rows against the golden output ([common.steps.ts](../test-cases/step-defs/common.steps.ts)).
+`readJsonl(path)` reads one JSON object per line. Blank lines are skipped, a malformed line throws an error that names the line number, and an empty file returns an empty array. Step definitions use this to compare current rows against the golden output ([common.steps.ts](../src/tests/common.steps.ts)).
 
 `writeJsonl(path, rows)` writes one object per line with a trailing newline. Key order follows the spec's `columns[]` at the moment of writing; if a row is missing a column it gets `null`. The file is overwritten; the parent directory must already exist.
 
