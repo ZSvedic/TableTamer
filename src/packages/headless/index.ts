@@ -1,6 +1,7 @@
 import { generateText, tool, stepCountIs, jsonSchema } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
 import * as jsonpatch from 'fast-json-patch';
+import { basename } from 'node:path';
 import {
   loadCsv,
   validateSpec,
@@ -74,7 +75,7 @@ const SYSTEM_PROMPT = `You are TableTamer, an LLM that edits a JSON Spec describ
 Key rules:
 - New requests are additive. Use {op:"add", path:"/transformations/-", value:<Transformation>} to append. Never remove or replace a prior transformation unless the user explicitly says to undo or replace it.
 - Choose {js} only when the rule is purely structural (filter by exact column value, dedupe by key, simple boolean predicates). Choose {llm} for any task that requires semantic understanding (normalize phone/country/date, translate, classify, summarize, infer). The words "normalize", "canonicalize", "translate", "format", "infer", "classify" all signal {llm}. Pick {llm} when unsure.
-- Column targeting: pick the target column from explicit names in the user request ("DOB", "phone column", "Country") or the keyword list annotated on each few-shot below. NEVER default to Phone, Country, or any other column when the request doesn't hint at it — if you can't identify a target, emit an empty operations array and let the recovery loop surface the ambiguity.
+- Column targeting: identify the target column from the user request — an explicit column name ("DOB", "Country", "Phone") or a keyword from the few-shots below ("phone numbers" → Phone, "country names" → Country, "date of birth" → DOB). A request that names or describes a column IS a clear target — apply the transformation to it; that is following the request, not "defaulting." Only emit an empty operations array when the request points at no column at all. Never invent a target the request never mentions.
 
 Spec shape (V1):
 {
@@ -249,7 +250,11 @@ function validateTemplate(template: string, rows: Row[]): void {
 // ── Prompt builders for the recovery loop ───────────────────────────────────
 
 function buildPrompt(text: string, spec: Spec, errPrefix?: string): string {
-  const specJson = JSON.stringify(spec, null, 2);
+  // The LLM edits transformations/columns/view-ops — never `table`. A long
+  // absolute source path is prompt noise that derails the patch turn, so the
+  // model only ever sees the basename.
+  const llmSpec = spec.table ? { ...spec, table: basename(spec.table) } : spec;
+  const specJson = JSON.stringify(llmSpec, null, 2);
   if (!errPrefix) return `Current spec:\n${specJson}\n\nUser request: ${text}`;
   return `${errPrefix}\n\nCurrent spec:\n${specJson}\n\nOriginal user request: ${text}\n\nEmit a corrected patch.`;
 }
