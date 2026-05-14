@@ -1,6 +1,6 @@
 import { generateText, tool, stepCountIs, jsonSchema } from 'ai';
 import { createAnthropic } from '@ai-sdk/anthropic';
-import * as jsonpatch from 'fast-json-patch';
+import jsonpatch, { type Operation } from 'fast-json-patch';
 import { basename } from 'node:path';
 import {
   loadCsv,
@@ -266,7 +266,7 @@ function applyAndValidate(currentSpec: Spec, ops: unknown[]): PatchAttempt {
     if (ops.length === 0) {
       return { kind: 'err', message: 'You called apply_spec_patch with an empty operations array. Emit at least one operation that fulfills the user request.' };
     }
-    const patched = jsonpatch.applyPatch(structuredClone(currentSpec), ops as jsonpatch.Operation[], false, false).newDocument as unknown;
+    const patched = jsonpatch.applyPatch(structuredClone(currentSpec), ops as Operation[], false, false).newDocument as unknown;
     const validated = validateSpec(patched);
     if (JSON.stringify(validated) === JSON.stringify(currentSpec)) {
       return { kind: 'err', message: 'Your patch applied cleanly but left the spec identical to before. Emit operations that actually modify the spec to fulfill the user request.' };
@@ -430,7 +430,7 @@ class HeadlessRunnerImpl implements HeadlessRunner {
       prompt,
       tools: { apply_spec_patch: applySpecPatch },
       toolChoice: { type: 'tool', toolName: 'apply_spec_patch' },
-      stopWhen: stepCountIs(2),
+      stopWhen: stepCountIs(1),
       abortSignal: signal,
       temperature: 0,
       maxRetries: this.opts.maxRetries ?? DEFAULT_MAX_RETRIES,

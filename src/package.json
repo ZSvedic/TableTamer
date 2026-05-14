@@ -6,8 +6,8 @@
     "packages/*"
   ],
   "scripts": {
-    "test": "bunx --bun cucumber-js --profile headless ; bunx --bun cucumber-js --profile cli",
-    "test:offline": "bun test && bunx --bun cucumber-js --profile cli --tags @offline"
+    "test": "bun x cucumber-js --profile headless ; bun x cucumber-js --profile cli",
+    "test:offline": "bun test && bun x cucumber-js --profile cli --tags @offline"
   },
   "devDependencies": {
     "@cucumber/cucumber": "^12.8.2",
