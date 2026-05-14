@@ -1,6 +1,6 @@
 # Spec writing style
 
-Conventions for everything under `spec/`. Modeled on the PonyPen spec dir and the in-project [rationale.md](rationale.md).
+Conventions for everything under `spec/`. Modeled on the PonyPen spec dir and the in-project [rationale.md](../spec/rationale.md).
 
 ## Write like you speak
 - Active voice. *"The runner replays transformations,"* not *"transformations are replayed by the runner."*

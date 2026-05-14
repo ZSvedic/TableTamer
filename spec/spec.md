@@ -1,6 +1,6 @@
 # TableTamer specs
 
-- [Writing style](writing-style.md) — conventions for everything in this directory.
+- [Writing style](../ops/writing-style.md) — how the docs in this directory are written.
 - [Data model](data-model.md) — the wire format: spec + patches.
 - [Rationale](rationale.md) — what TableTamer is and why.
 

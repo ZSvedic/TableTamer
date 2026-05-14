@@ -1,4 +1,4 @@
-Read [writing-style.md](../../spec/writing-style.md) first (in case any spec needs follow-up clarification), then [conventions.md](../conventions.md), the spec hub at [spec/spec.md](../../spec/spec.md), the four V1 sub-docs ([core.md](../../spec/core.md), [runner.md](../../spec/runner.md), [headless.md](../../spec/headless.md), [cli.md](../../spec/cli.md)), [data-model.md](../../spec/data-model.md), and [phase-1-pre-spec.md](../phases/phase-1-pre-spec.md) for the Q1–Q15 decisions. The step defs at [src/tests/](../../src/tests/) are the executable target — every symbol they import must resolve to a working implementation.
+Read [writing-style.md](../writing-style.md) first (in case any spec needs follow-up clarification), then [conventions.md](../conventions.md), the spec hub at [spec/spec.md](../../spec/spec.md), the four V1 sub-docs ([core.md](../../spec/core.md), [runner.md](../../spec/runner.md), [headless.md](../../spec/headless.md), [cli.md](../../spec/cli.md)), [data-model.md](../../spec/data-model.md), and [phase-1-pre-spec.md](../phases/phase-1-pre-spec.md) for the Q1–Q15 decisions. The step defs at [src/tests/](../../src/tests/) are the executable target — every symbol they import must resolve to a working implementation.
 
 Then execute the backlog in [phase-4-imp-cli.md](../phases/phase-4-imp-cli.md) to turn V1 red into green.
 
@@ -13,6 +13,6 @@ Process:
 Out of scope for this session:
 - V2 features (`group`, `join`, `Expr.sql`, web app, CSV-out, DuckDB, voice).
 - `@web`-tagged scenarios.
-- Modifying [conventions.md](../conventions.md), [phase-1-pre-spec.md](../phases/phase-1-pre-spec.md), [data-model.md](../../spec/data-model.md), [writing-style.md](../../spec/writing-style.md), or the four V1 sub-docs without explicit instruction.
+- Modifying [conventions.md](../conventions.md), [phase-1-pre-spec.md](../phases/phase-1-pre-spec.md), [data-model.md](../../spec/data-model.md), [writing-style.md](../writing-style.md), or the four V1 sub-docs without explicit instruction.
 
 If everything is clear, please confirm before executing.

@@ -79,15 +79,9 @@ type Transformation =
 `Expr` lets any verb swap deterministic code for an LLM prompt:
 - `{js: "..."}` → `new Function()`-evaluated arrow function; signature `(row, index, allRows) => result`. **V1.**
 - `{sql: "..."}` → DuckDB. **V2.**
-- `{llm: "..."}` → render one prompt per row, **batch** N rendered prompts into a single LLM call that replies with a JSON array of N results, run several batches in parallel, and cache by `(model, rendered prompt)` so duplicate inputs cost nothing after the first. **V1.**
+- `{llm: "..."}` → a prompt template rendered per row; the runtime batches, parallelizes, and caches the calls — see [headless.md](headless.md) for the protocol. **V1.**
 
 **V1 subset:** `filter` + `mutate` (both modes) + `select` + `sort` (sql only). `group`/`join` are V2.
-
-**Example — LLM-driven country canonicalization:**
-```json
-{ "kind": "mutate", "columns": "Country",
-  "value": { "llm": "Normalize country name '{Country}' to standard English." } }
-```
 
 ## Per-turn token budget
 
@@ -110,14 +104,12 @@ The model edits the spec; the runtime fills in just-enough data context as promp
 - **On model request:** row count, distinct counts, top-K values, percentiles, one sample row.
 - **Never:** the rows themselves.
 
-These are runtime-supplied slots, not state the model maintains.
-
 ## Rendering
 
 Client receives `(spec, row_stream)`:
 - Spec drives column layout, formatters, header order.
 - Rows stream paginated / virtualized for the huge case.
-- Renderer (MUI DataGrid, AG Grid, TanStack Table, plain `<table>`) is implementation detail. The spec is the wire protocol.
+- Renderer is an implementation detail — the spec is the wire protocol.
 
 ## Failure recovery
 

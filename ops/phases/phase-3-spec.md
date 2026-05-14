@@ -2,7 +2,7 @@
 
 Goal: write V1 specification documents under [spec/](../../spec/). No code in this phase — phase 4 implements against these specs. The symbols phase 2 surfaced (types, I/O, runner factories) get described as semantics, not as TypeScript signatures.
 
-Prerequisites: Q1–Q15 in [phase-1-pre-spec.md](phase-1-pre-spec.md), the wire model in [data-model.md](../../spec/data-model.md), the step-def usage in [test-cases/step-defs/](../../src/tests/) as the API-surface inventory, and [writing-style.md](../../spec/writing-style.md) as the voice and structure guide. [spec.md](../../spec/spec.md) is the index that will link to the four sub-docs once written.
+Prerequisites: Q1–Q15 in [phase-1-pre-spec.md](phase-1-pre-spec.md), the wire model in [data-model.md](../../spec/data-model.md), the step-def usage in [test-cases/step-defs/](../../src/tests/) as the API-surface inventory, and [writing-style.md](../writing-style.md) as the voice and structure guide. [spec.md](../../spec/spec.md) is the index that will link to the four sub-docs once written.
 
 ## Backlog
 
@@ -16,6 +16,6 @@ Prerequisites: Q1–Q15 in [phase-1-pre-spec.md](phase-1-pre-spec.md), the wire 
 
 ## Definition of done
 - Every symbol referenced in [test-cases/step-defs/](../../src/tests/) has a defining section in one of the four sub-docs.
-- Each doc follows [writing-style.md](../../spec/writing-style.md): declarative voice, two-sentence opener stating ownership and delegation, prose over bullets, one worked example per surface, 40–80 lines.
+- Each doc follows [writing-style.md](../writing-style.md): declarative voice, two-sentence opener stating ownership and delegation, prose over bullets, one worked example per surface, 40–80 lines.
 - Cross-references to [data-model.md](../../spec/data-model.md) and [phase-1-pre-spec.md](phase-1-pre-spec.md) Q-answers where applicable; no duplication, no contradictions.
 - No changes to [packages/](../../src/packages/) or [test-cases/](../../spec/test-cases/) — those are phase 4.
