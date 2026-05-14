@@ -16,7 +16,7 @@
         "kind": "mutate",
         "columns": "Phone",
         "value": {
-          "llm": "Convert this phone number to E.164 format (a + followed by country code and the remaining digits with no spaces, dashes, parentheses, or dots). Input phone: '{Phone}'. Customer country: '{Country}'. Use ONLY the digits already present in the input — do not infer, guess, or add area codes or extra digits that are not literally in the input. If the input begins with 00 or +, strip the prefix and keep the rest. Reply with only the resulting E.164 string and no other text. If the number lacks enough information to normalize unambiguously (missing country/area code, value like 'NA' or '-' or empty), reply with the literal word: null"
+          "llm": "Convert this phone number to E.164 format (a + followed by the country code and the national number, with no spaces, dashes, parentheses, or dots). Input phone: '{Phone}'. Customer country: '{Country}'. If the input starts with + or with a 0/00 international-dialing prefix in front of a country code, that leading part is the country code — drop any 0/00 and keep it. If the input has no international prefix at all, infer the country code from the customer country and prepend it. Use exactly the digits present in the input as the national number — never drop, pad, or invent digits. Reply with ONLY the resulting E.164 string (e.g. +12005551234) and nothing else. If the input is empty, 'NA', '-', or is just a short local number with no area code (so it cannot form a complete E.164 number), reply with the literal word: null"
         }
       },
       {
