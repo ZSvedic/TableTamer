@@ -1,3 +1,4 @@
+@cancel
 Feature: Cancel long-running LLM transformation
 
   Background:

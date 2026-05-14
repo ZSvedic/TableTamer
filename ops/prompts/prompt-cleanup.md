@@ -7,7 +7,7 @@ B. can it be simplified or removed?
    For example, something can be mentioned in @ops/phases/phase-1-pre-spec.md (because of discussion), then in Gherkin file (test case), and then in spec (TDD requires same things said in tests and spec). 
    But, remove unintentional duplications.
 
-To verify that you have done it for all files in git repo, create a status-report-YYYY-MM-DD.md (with current date) in root with a table having 4 columns: 
+To verify that you have done it for all files in git repo, create a status-report-YYYY-MM-DD.md (with current date) in ops/status-reports/ with a table having 4 columns: 
 1. File: md link
 2. Consistent: Yes/No [: explanation...]
 3. Simplified: Yes/No [: explanation...]

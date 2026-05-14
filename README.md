@@ -6,21 +6,27 @@ V1 ships a terminal CLI and a headless library. A web UI is V2.
 
 ## Project layout
 
-The repo is organized by **lifecycle**, not by file type:
+Organized by **lifecycle**, not by file type:
 
 ```
-ops/      How the project is built: prompts, phase backlogs, status reports,
-          repo-tracking scripts, conventions, research notes. Never deployed.
-spec/     The contract: *.md specs + test-cases/ (Gherkin features + fixtures).
-          Human-authored / human-blessed.
-src/      The implementation. Self-contained, deployable unit — it carries its
-          own package.json, bun.lock, node_modules/. Run bun from here.
-          src/packages/  — core / headless / cli (regenerable from spec/*.md)
-          src/tests/     — cucumber step definitions (regenerable from Gherkin)
-temp/     Scratch: generated outputs, charts, logs. Gitignored, deletable.
+TableTamer/                  root holds only README.md, LICENSE, .gitignore
+├── ops/                     how the project is built; never deployed
+│   ├── prompts/             reusable phase-runner prompt templates
+│   ├── phases/              per-phase backlogs + the Q1–Q15 decision record
+│   ├── status-reports/      session-by-session audit trail
+│   ├── repo-tracking/       commit-size script + chart generator
+│   ├── conventions.md       stack, layout & dev-process conventions
+│   └── research-links.md    name origin + library evaluations
+├── spec/                    the contract — human-authored / human-blessed
+│   ├── *.md                 API specs (hub at spec/spec.md)
+│   └── test-cases/          Gherkin features + -input/-expected/.flow fixtures
+├── src/                     the implementation — self-contained, deployable unit
+│   ├── package.json, …      build config; run every bun command from here
+│   ├── node_modules/        gitignored
+│   ├── packages/            core / headless / cli — regenerable from spec/*.md
+│   └── tests/               cucumber step definitions — regenerable from Gherkin
+└── temp/                    scratch: test outputs, charts, logs — gitignored
 ```
-
-Root holds only `README.md`, `LICENSE`, `.gitignore`. Everything build-related lives in `src/`, so **all `bun` commands run from `src/`**. Conventions for the stack and the dev process are in [ops/conventions.md](ops/conventions.md).
 
 ## Setup
 
@@ -39,8 +45,8 @@ Optional env vars and defaults if you omit them:
 
 | Var | Default | What it does |
 |---|---|---|
-| `TABLETAMER_MODEL` | `claude-sonnet-4-5` | Model that writes the spec patch each turn. |
-| `TABLETAMER_CELL_MODEL` | `claude-sonnet-4-5` | Model that fills in per-row LLM cells. Default matches the patch model for accuracy on multi-row batches; override with `claude-haiku-4-5` for cheaper/faster runs at some cost in per-cell fidelity. |
+| `TABLETAMER_MODEL` | `claude-sonnet-4-6` | Model that writes the spec patch each turn. |
+| `TABLETAMER_CELL_MODEL` | `claude-sonnet-4-5` | Model that fills in per-row LLM cells. Override with `claude-haiku-4-5` for cheaper/faster runs at some cost in per-cell fidelity. |
 | `TABLETAMER_RPM` | `40` | Per-process request-per-minute cap. The Anthropic org-wide ceiling is 50. |
 | `TABLETAMER_BATCH_SIZE` | `20` | Rows packed into a single LLM request. The model replies with a JSON array; on a parse failure the runner falls back to per-row calls for that batch. Set to `1` to disable batching. |
 | `TABLETAMER_CHUNK_SIZE` | `5` | LLM requests that fire concurrently. Orthogonal to batch size — total parallel rows = batch × chunk. |

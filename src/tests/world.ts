@@ -1,4 +1,9 @@
-import { setWorldConstructor, World as CucumberWorld, type IWorldOptions } from '@cucumber/cucumber';
+import {
+  setWorldConstructor,
+  World as CucumberWorld,
+  type IWorldOptions,
+  type ITestCaseHookParameter,
+} from '@cucumber/cucumber';
 import { join } from 'node:path';
 import type { Row, Spec } from '@tabletamer/core';
 
@@ -46,3 +51,13 @@ export class TableTamerWorld extends CucumberWorld {
 }
 
 setWorldConstructor(TableTamerWorld);
+
+/**
+ * Per-scenario runner options derived from tags. `@cancel` scenarios run with a
+ * tiny batch/chunk size so the 20-row fixture yields many chunks — otherwise it
+ * produces a single chunk and an abort has no mid-flight window to land in.
+ */
+export function runnerOptsFor(scenario: ITestCaseHookParameter): { batchSize?: number; chunkSize?: number } {
+  const tags = scenario.pickle.tags.map((t) => t.name);
+  return tags.includes('@cancel') ? { batchSize: 2, chunkSize: 1 } : {};
+}

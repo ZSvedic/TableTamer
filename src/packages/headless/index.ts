@@ -60,7 +60,7 @@ export interface HeadlessRunner {
   exportAs(path: string): Promise<void>;
 }
 
-const DEFAULT_MODEL = process.env.TABLETAMER_MODEL ?? 'claude-sonnet-4-5';
+const DEFAULT_MODEL = process.env.TABLETAMER_MODEL ?? 'claude-sonnet-4-6';
 const DEFAULT_CELL_MODEL = process.env.TABLETAMER_CELL_MODEL ?? 'claude-sonnet-4-5';
 const DEFAULT_MAX_RETRIES = 6;
 const DEFAULT_RPM = Number(process.env.TABLETAMER_RPM ?? 40);

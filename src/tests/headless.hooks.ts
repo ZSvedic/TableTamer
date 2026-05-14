@@ -1,9 +1,10 @@
-import { Before } from '@cucumber/cucumber';
+import { Before, type ITestCaseHookParameter } from '@cucumber/cucumber';
 import { createHeadlessRunner } from '@tabletamer/headless';
-import { TableTamerWorld } from './world.ts';
+import { TableTamerWorld, runnerOptsFor } from './world.ts';
 
-Before({ tags: '@headless' }, function (this: TableTamerWorld) {
+Before({ tags: '@headless' }, function (this: TableTamerWorld, scenario: ITestCaseHookParameter) {
   if (this.surface !== 'headless') return;
   this.runnerKind = 'headless';
-  this.runnerFactory = () => createHeadlessRunner();
+  const opts = runnerOptsFor(scenario);
+  this.runnerFactory = () => createHeadlessRunner(opts);
 });

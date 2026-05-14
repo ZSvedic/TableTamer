@@ -58,7 +58,7 @@ REPL:
 
 Environment (full table in README.md):
   ANTHROPIC_API_KEY        required (loaded from .env if missing or empty)
-  TABLETAMER_MODEL         default claude-sonnet-4-5   patch turn
+  TABLETAMER_MODEL         default claude-sonnet-4-6   patch turn
   TABLETAMER_CELL_MODEL    default claude-sonnet-4-5   per-cell turn
   TABLETAMER_BATCH_SIZE    default 20                  rows per LLM request
   TABLETAMER_CHUNK_SIZE    default 5                   concurrent requests
