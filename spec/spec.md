@@ -3,7 +3,6 @@
 - [Writing style](writing-style.md) — conventions for everything in this directory.
 - [Data model](data-model.md) — the wire format: spec + patches.
 - [Rationale](rationale.md) — what TableTamer is and why.
-- [Architecture decisions](../ops/phases/phase-1-pre-spec.md) — Q1–Q15 audit trail behind the spec.
 
 ## API
 
