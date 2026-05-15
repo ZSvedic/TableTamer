@@ -27,7 +27,9 @@ signature `(row, index, allRows)`) or LLM-backed (a prompt template with
 
 A new request is *additive*: it appends; nothing prior is removed or replaced
 unless the user explicitly says undo or replace. "Undo" pops the last
-transformation and replays the rest against the source — no LLM call.
+applied patch — reversing every transformation and column change the most
+recent user turn introduced, as a single unit — and replays the rest
+against the source. No LLM call.
 
 Per-turn token budget stays constant regardless of table size or conversation
 length: cached system prompt (~600 tokens) + current spec (~300) + user
@@ -75,9 +77,12 @@ The runner caches the result of replaying. When a new spec adds to the tail
 of the previous list (the prefix is unchanged), the runner reuses the cached
 derived rows and runs only the new tail.
 
-CSV in, JSONL out. Every CSV value stays a string — the runtime doesn't
-guess whether something is a number or a date; type inference is the LLM's
-job via a `mutate` transformation.
+CSV or JSONL in, JSONL out. Every CSV value stays a string — the runtime
+doesn't guess whether something is a number or a date; type inference is
+the LLM's job via a `mutate` transformation. Leading and trailing
+whitespace around each unquoted CSV field is trimmed before the value
+becomes the cell string; quoted fields are preserved verbatim, including
+whitespace inside the quotes. JSONL inputs keep their native JSON types.
 
 → [code-contract.md — Core / runner](code-contract.md#core--runner)
 
@@ -139,15 +144,34 @@ that re-runs a saved spec against a CSV.
 
 ### REPL
 
-The REPL prints a fresh ASCII table after every successful request. No
-terminal control codes — think `sqlite3` or `jq`, not `vim`. Long LLM
+The REPL prints a fresh ASCII table after every event that changes the
+visible table state: a successful natural-language request, `/load`, or
+`/undo`. Slash commands that don't change table state (`/help`, `/save`,
+`/save-flow`, `/exit`) print only their own output. A failed request
+prints the error and does not reprint the table.
+
+Tables paginate at 10 rows per page (the default page size). When rows
+exist outside the current page, the truncated end renders a marker row
+`...{N} more rows.` in place of the cells — at the top when rows are
+hidden above the current page, at the bottom when rows are hidden below.
+No terminal control codes — think `sqlite3` or `jq`, not `vim`. Long LLM
 transformations print a few sample row changes per chunk while they run.
 
 Slash commands are handled locally without any LLM round-trip:
 
 - `/help` prints the usage screen inline.
-- `/undo` pops the last transformation. On an empty history, prints
-  `nothing to undo.`
+- `/undo` pops the last applied patch — reversing every transformation
+  and column change the most recent user turn introduced, as a single
+  unit. On an empty history, prints `nothing to undo.`
+- `/load <path>` reads a CSV or JSONL file as the new input source (file
+  type inferred from extension; only `.csv` and `.jsonl` accepted in V1;
+  `<path>` is taken literally — a leading `@` is part of the filename,
+  not a Claude-Code-style file reference). Resets transformations,
+  filter/sort, and cached LLM cell results just like loading at startup.
+  Missing path prints `/load: missing path`; unknown extension prints
+  `/load: unknown file type`; success prints
+  `Loaded <path> (N rows, M cols)` (no column names) followed by the
+  table.
 - `/save <path>` writes current rows to a JSONL file (path resolved relative
   to the working directory; only `.jsonl` accepted in V1). Missing path
   prints `/save: missing path`; success prints a `saved` confirmation.

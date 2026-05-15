@@ -37,7 +37,7 @@ interface Spec {
 
 A single Zod schema covers the V1 type set and runs at three points:
 
-1. When `loadCsv` builds the initial spec.
+1. When `loadCsv` or `loadJsonl` builds the initial spec.
 2. When the `apply_spec_patch` tool merges a patch.
 3. When `runCli execute` loads a `.flow` file.
 
@@ -57,7 +57,8 @@ Patches: RFC 6902 via `fast-json-patch`; RFC 7396 merge hand-rolled
 → [behavior.md — Core / runner](behavior.md#core--runner)
 
 ```ts
-function loadCsv(path: string): Promise<{ spec: Spec; rows: Row[]; sourcePath: string }>;
+function loadCsv(path: string):   Promise<{ spec: Spec; rows: Row[]; sourcePath: string }>;
+function loadJsonl(path: string): Promise<{ spec: Spec; rows: Row[]; sourcePath: string }>;
 function readJsonl(path: string): Promise<Row[]>;
 function writeJsonl(path: string, rows: Row[], columnOrder?: string[]): Promise<void>;
 
@@ -79,9 +80,16 @@ type ChunkUpdate = {
 };
 ```
 
-CSV parsing uses `csv-parse`. `writeJsonl` overwrites the file; the parent
-directory must already exist. The recovery budget is 3 turns; running out
-throws an error carrying a `debug` field with the per-turn ops and outcomes.
+CSV parsing uses `csv-parse` with `trim: true` (unquoted leading/trailing
+whitespace stripped; quoted fields preserved verbatim). `loadJsonl` reads the file with the same
+streaming reader as `readJsonl` and derives the initial column list from
+the union of keys across rows (insertion order from the first row each key
+appears in). `Runner.loadInput` dispatches on file extension — `.csv` to
+`loadCsv`, `.jsonl` to `loadJsonl`; any other extension throws with a clear
+*"unknown file type"* error that the REPL surfaces inline. `writeJsonl`
+overwrites the file; the parent directory must already exist. The recovery
+budget is 3 turns; running out throws an error carrying a `debug` field
+with the per-turn ops and outcomes.
 
 `Runner` is the surface step definitions drive ([common.steps.ts](../src/tests/common.steps.ts));
 the CLI and headless packages both return Runners with the same method
@@ -146,8 +154,10 @@ function runCli(argv: string[]): Promise<{ exitCode: number; stderr: string }>;
 ```
 
 REPL uses `node:readline/promises`. The ASCII renderer is hand-rolled
-`padEnd` (~30 LOC). `runCli` returns instead of calling `process.exit` so
-callers can decide what to do with a failure.
+`padEnd` (~30 LOC) and paginates at `REPL_PAGE_SIZE = 10` rows; when rows
+fall outside the current page, the truncated edge renders a single marker
+row `...{N} more rows.` in place of cells. `runCli` returns instead of
+calling `process.exit` so callers can decide what to do with a failure.
 
 `.flow` file shape:
 
@@ -169,7 +179,7 @@ Exit codes:
 | 0 | success |
 | 1 | unrecognized subcommand or missing required flag |
 | 2 | `.flow` file unreadable, invalid JSON, or fails Zod validation |
-| 3 | a transformation references a column the loaded CSV lacks, or a JS expression throws |
+| 3 | a transformation references a column the loaded input lacks, or a JS expression throws |
 | 4 | couldn't write to `--output` |
 
 `stderr` carries one human-readable line per non-zero exit.

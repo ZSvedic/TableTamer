@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "woz-ui",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["temp/server.js"],
+      "port": 4040
+    }
+  ]
+}
