@@ -11,22 +11,31 @@ Organized by **lifecycle**, not by file type:
 ```
 TamedTable/                  root holds only README.md, LICENSE, .gitignore
 ├── ops/                     how the project is built; never deployed
-│   ├── prompts/             reusable phase-runner prompt templates
+│   ├── prompts/             reusable prompt templates
+│   │   ├── prompt-woz.md       WoZ — interactive behavior simulator
+│   │   ├── prompt-scribe.md    SCRIBE — spec editor (paired with WoZ)
+│   │   └── prompt-*.md         frozen phase-3 / phase-4 templates
 │   ├── phases/              per-phase backlogs + the Q1–Q15 decision record
 │   ├── status-reports/      session-by-session audit trail
 │   ├── repo-tracking/       commit-size script + chart generator
 │   ├── conventions.md       stack, layout & dev-process conventions
 │   └── research-links.md    name origin + library evaluations
 ├── spec/                    the contract — human-authored / human-blessed
-│   ├── *.md                 API specs (hub at spec/spec.md)
+│   ├── spec.md              one-line index of every doc below
+│   ├── rationale.md         what TamedTable is and why
+│   ├── behavior.md          what the user sees + what the system does (API-free)
+│   ├── code-contract.md     types, signatures, libraries, env vars, exit codes
+│   ├── prompt-app-edit.md   the three LLM prompts (imported by the runtime at init)
 │   └── test-cases/          Gherkin features + -input/-expected/.flow fixtures
 ├── src/                     the implementation — self-contained, deployable unit
 │   ├── package.json, …      build config; run every bun command from here
 │   ├── node_modules/        gitignored
-│   ├── packages/            core / headless / cli — regenerable from spec/*.md
+│   ├── packages/            core / headless / cli — regenerable from spec/
 │   └── tests/               cucumber step definitions — regenerable from Gherkin
 └── temp/                    scratch: test outputs, charts, logs — gitignored
 ```
+
+`behavior.md` and `code-contract.md` are section-aligned twins: `behavior.md` describes what happens in plain English (no types, no library names); `code-contract.md` carries the matching types, signatures, env vars, and exit codes. Each section in one links to the same section in the other.
 
 ## Setup
 
@@ -108,6 +117,29 @@ bun test                                                      # bun unit tests o
 ```
 
 The `headless` profile binds `createHeadlessRunner` from `@tamedtable/headless`; the `cli` profile binds `createCliRunner` / `runCli` from `@tamedtable/cli`. Both cover [datanorm](spec/test-cases/datanorm.feature), [dedupe](spec/test-cases/dedupe.feature), [filter](spec/test-cases/filter.feature), and [cancelation](spec/test-cases/cancelation.feature); the `cli` profile also covers [cli-flags](spec/test-cases/cli-flags.feature) and [repl-commands](spec/test-cases/repl-commands.feature).
+
+## Iterate on the spec with WoZ and SCRIBE
+
+WoZ (Wizard-of-Oz) and SCRIBE let you iterate TamedTable's behavior interactively without running the implementation. WoZ simulates what TamedTable would do from `spec/behavior.md` + `spec/prompt-app-edit.md` only; when WoZ reveals a gap or surprise, SCRIBE updates the spec.
+
+In a fresh Claude Code session at the repo root:
+
+```
+claude
+> @ops/prompts/prompt-woz.md
+```
+
+That sets the WoZ persona. Now type CLI-shaped input (`/help`, `> normalize phone numbers`, `execute datanorm.flow …`) and WoZ replies as TamedTable would. Two modes auto-select from what you type:
+
+- **deterministic** — slash commands, table renders, exit codes, `{js}` predicates: byte-for-byte reproduction from `behavior.md`.
+- **patch** — natural-language transformation requests: emits the JSON Patch the spec-editor LLM should produce per `prompt-app-edit.md`. For `{llm:…}` columns, WoZ appends 3–5 synthesized sample cell values (plausible, not golden). Prefix `patch only:` to suppress synthesis.
+
+Switch personas in-session without restarting:
+
+- `scribe: <note>` — hand off to SCRIBE with `<note>` as the spec edit to capture. SCRIBE edits `spec/behavior.md` (almost always), `spec/code-contract.md` (only when the API surface changes), or `spec/prompt-app-edit.md` (prompt tuning). It never touches `src/`, `ops/phases/`, or `spec/test-cases/*.feature`.
+- After a SCRIBE edit, ask to simulate again and SCRIBE switches back to WoZ.
+
+For V2 web-UI questions WoZ produces a Claude artifact or writes a sketch to `temp/` rather than refusing.
 
 ## Known limitations
 
