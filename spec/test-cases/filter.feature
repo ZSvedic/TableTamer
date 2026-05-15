@@ -23,5 +23,5 @@ Feature: Filter customer records
     Scenario: Execute saved flow from command line
       Given "filter.flow" exists
       And the golden output is "filter-expected.jsonl"
-      When user runs "tabletamer execute filter.flow --input filter-input.csv --output filter-output.jsonl"
+      When user runs "tamedtable execute filter.flow --input filter-input.csv --output filter-output.jsonl"
       Then "filter-output.jsonl" matches the golden output

@@ -1,9 +1,9 @@
 import { Given, When, Then, setDefaultTimeout } from '@cucumber/cucumber';
 import { strict as assert } from 'node:assert';
 import { join } from 'node:path';
-import type { ChunkUpdate } from '@tabletamer/headless';
-import { loadCsv } from '@tabletamer/core';
-import { TableTamerWorld, SPEC_TC_DIR } from './world.ts';
+import type { ChunkUpdate } from '@tamedtable/headless';
+import { loadCsv } from '@tamedtable/core';
+import { TamedTableWorld, SPEC_TC_DIR } from './world.ts';
 
 const DEFAULT_INPUT = join(SPEC_TC_DIR, 'datanorm-input.csv');
 
@@ -21,7 +21,7 @@ interface CancelCtx {
   cancelLatencyMs?: number;
 }
 
-const cancelCtx = new WeakMap<TableTamerWorld, CancelCtx>();
+const cancelCtx = new WeakMap<TamedTableWorld, CancelCtx>();
 
 async function waitForChunk(ctx: CancelCtx, timeoutMs = 120_000): Promise<void> {
   const start = Date.now();
@@ -32,7 +32,7 @@ async function waitForChunk(ctx: CancelCtx, timeoutMs = 120_000): Promise<void> 
   }
 }
 
-When('user requests {string} via LLM', async function (this: TableTamerWorld, text: string) {
+When('user requests {string} via LLM', async function (this: TamedTableWorld, text: string) {
   const runner = this.ensureRunner() as unknown as CancellableRunner;
   const abort = new AbortController();
   const chunks: ChunkUpdate[] = [];
@@ -44,13 +44,13 @@ When('user requests {string} via LLM', async function (this: TableTamerWorld, te
   cancelCtx.set(this, ctx);
 });
 
-When('at least one chunk has completed', async function (this: TableTamerWorld) {
+When('at least one chunk has completed', async function (this: TamedTableWorld) {
   const ctx = cancelCtx.get(this);
   if (!ctx) throw new Error('no LLM request in flight');
   await waitForChunk(ctx);
 });
 
-When('user cancels the operation after at least one chunk has completed', async function (this: TableTamerWorld) {
+When('user cancels the operation after at least one chunk has completed', async function (this: TamedTableWorld) {
   const ctx = cancelCtx.get(this);
   if (!ctx) throw new Error('no LLM request in flight');
   await waitForChunk(ctx);
@@ -64,7 +64,7 @@ When('user cancels the operation after at least one chunk has completed', async 
   ctx.cancelLatencyMs = Date.now() - cancelAt;
 });
 
-Then('processing stops within 2 seconds', function (this: TableTamerWorld) {
+Then('processing stops within 2 seconds', function (this: TamedTableWorld) {
   const ctx = cancelCtx.get(this);
   if (!ctx) throw new Error('no LLM request in flight');
   assert.ok(
@@ -73,7 +73,7 @@ Then('processing stops within 2 seconds', function (this: TableTamerWorld) {
   );
 });
 
-Then('the spec contains no llm-map transformation for Country', function (this: TableTamerWorld) {
+Then('the spec contains no llm-map transformation for Country', function (this: TamedTableWorld) {
   const spec = this.ensureRunner().currentSpec() as { transformations: Array<{ kind: string; columns?: string | string[]; value?: { llm?: string } }> };
   const found = spec.transformations.some((t) => {
     if (t.kind !== 'mutate') return false;
@@ -83,7 +83,7 @@ Then('the spec contains no llm-map transformation for Country', function (this: 
   assert.ok(!found, 'spec still contains an LLM mutate transformation for Country');
 });
 
-Then('the table shows pre-transformation values for every row', async function (this: TableTamerWorld) {
+Then('the table shows pre-transformation values for every row', async function (this: TamedTableWorld) {
   const inputPath = this.inputPath ?? DEFAULT_INPUT;
   const { rows: source } = await loadCsv(inputPath);
   const current = this.ensureRunner().currentRows();
@@ -93,7 +93,7 @@ Then('the table shows pre-transformation values for every row', async function (
   }
 });
 
-Then('the table shows transformed values for already-processed rows', function (this: TableTamerWorld) {
+Then('the table shows transformed values for already-processed rows', function (this: TamedTableWorld) {
   const ctx = cancelCtx.get(this);
   if (!ctx) throw new Error('no LLM request in flight');
   assert.ok(ctx.chunks.length > 0, 'no chunks observed');
@@ -102,7 +102,7 @@ Then('the table shows transformed values for already-processed rows', function (
   }
 });
 
-Then('the table shows original values for unprocessed rows', async function (this: TableTamerWorld) {
+Then('the table shows original values for unprocessed rows', async function (this: TamedTableWorld) {
   const ctx = cancelCtx.get(this);
   if (!ctx) throw new Error('no LLM request in flight');
   const inputPath = this.inputPath ?? DEFAULT_INPUT;
@@ -111,11 +111,11 @@ Then('the table shows original values for unprocessed rows', async function (thi
   assert.ok(processed.size < source.length, 'every row was processed; need at least one unprocessed row to assert');
 });
 
-Given('Phone column has been normalized', async function (this: TableTamerWorld) {
+Given('Phone column has been normalized', async function (this: TamedTableWorld) {
   await this.ensureRunner().request('Normalize phone numbers');
 });
 
-Then('Phone column still shows normalized values', function (this: TableTamerWorld) {
+Then('Phone column still shows normalized values', function (this: TamedTableWorld) {
   const spec = this.ensureRunner().currentSpec() as { transformations: Array<{ kind: string; columns?: string | string[]; value?: { llm?: string } }> };
   const has = spec.transformations.some((t) => {
     if (t.kind !== 'mutate') return false;
@@ -125,7 +125,7 @@ Then('Phone column still shows normalized values', function (this: TableTamerWor
   assert.ok(has, `Phone normalization transformation was unexpectedly removed. Spec transformations: ${JSON.stringify(spec.transformations)}`);
 });
 
-Then('Country column shows pre-transformation values', async function (this: TableTamerWorld) {
+Then('Country column shows pre-transformation values', async function (this: TamedTableWorld) {
   const inputPath = this.inputPath ?? DEFAULT_INPUT;
   const { rows: source } = await loadCsv(inputPath);
   const current = this.ensureRunner().currentRows();

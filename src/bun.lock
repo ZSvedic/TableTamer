@@ -3,30 +3,30 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "tabletamer",
+      "name": "tamedtable",
       "devDependencies": {
         "@cucumber/cucumber": "^12.8.2",
-        "@tabletamer/cli": "workspace:*",
-        "@tabletamer/core": "workspace:*",
-        "@tabletamer/headless": "workspace:*",
+        "@tamedtable/cli": "workspace:*",
+        "@tamedtable/core": "workspace:*",
+        "@tamedtable/headless": "workspace:*",
         "@types/bun": "^1.3.13",
         "@types/node": "^25.6.0",
         "typescript": "^6.0.3",
       },
     },
     "packages/cli": {
-      "name": "@tabletamer/cli",
+      "name": "@tamedtable/cli",
       "version": "0.0.0",
       "bin": {
-        "tabletamer": "./src/index.ts",
+        "tamedtable": "./src/index.ts",
       },
       "dependencies": {
-        "@tabletamer/core": "workspace:*",
-        "@tabletamer/headless": "workspace:*",
+        "@tamedtable/core": "workspace:*",
+        "@tamedtable/headless": "workspace:*",
       },
     },
     "packages/core": {
-      "name": "@tabletamer/core",
+      "name": "@tamedtable/core",
       "version": "0.0.0",
       "dependencies": {
         "csv-parse": "^6.2.1",
@@ -34,11 +34,11 @@
       },
     },
     "packages/headless": {
-      "name": "@tabletamer/headless",
+      "name": "@tamedtable/headless",
       "version": "0.0.0",
       "dependencies": {
         "@ai-sdk/anthropic": "^3.0.74",
-        "@tabletamer/core": "workspace:*",
+        "@tamedtable/core": "workspace:*",
         "ai": "^6.0.174",
         "fast-json-patch": "^3.1.1",
       },
@@ -89,11 +89,11 @@
 
     "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
 
-    "@tabletamer/cli": ["@tabletamer/cli@workspace:packages/cli"],
+    "@tamedtable/cli": ["@tamedtable/cli@workspace:packages/cli"],
 
-    "@tabletamer/core": ["@tabletamer/core@workspace:packages/core"],
+    "@tamedtable/core": ["@tamedtable/core@workspace:packages/core"],
 
-    "@tabletamer/headless": ["@tabletamer/headless@workspace:packages/headless"],
+    "@tamedtable/headless": ["@tamedtable/headless@workspace:packages/headless"],
 
     "@teppeis/multimaps": ["@teppeis/multimaps@3.0.0", "", {}, "sha512-ID7fosbc50TbT0MK0EG12O+gAP3W3Aa/Pz4DaTtQtEvlc9Odaqi0de+xuZ7Li2GtK4HzEX7IuRWS/JmZLksR3Q=="],
 

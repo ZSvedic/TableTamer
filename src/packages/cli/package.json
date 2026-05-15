@@ -1,5 +1,5 @@
 {
-  "name": "@tabletamer/cli",
+  "name": "@tamedtable/cli",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,10 +9,10 @@
     ".": "./index.ts"
   },
   "bin": {
-    "tabletamer": "./index.ts"
+    "tamedtable": "./index.ts"
   },
   "dependencies": {
-    "@tabletamer/core": "workspace:*",
-    "@tabletamer/headless": "workspace:*"
+    "@tamedtable/core": "workspace:*",
+    "@tamedtable/headless": "workspace:*"
   }
 }

@@ -5,7 +5,7 @@ import {
   type ITestCaseHookParameter,
 } from '@cucumber/cucumber';
 import { join } from 'node:path';
-import type { Row, Spec } from '@tabletamer/core';
+import type { Row, Spec } from '@tamedtable/core';
 
 // Path anchors, resolved from this file's location so they hold regardless of cwd.
 // This file lives at src/tests/world.ts.
@@ -24,7 +24,7 @@ export interface Runner {
   exportAs(path: string): Promise<void>;
 }
 
-export class TableTamerWorld extends CucumberWorld {
+export class TamedTableWorld extends CucumberWorld {
   surface?: RunnerKind;
   inputPath?: string;
   goldenPath?: string;
@@ -50,7 +50,7 @@ export class TableTamerWorld extends CucumberWorld {
   }
 }
 
-setWorldConstructor(TableTamerWorld);
+setWorldConstructor(TamedTableWorld);
 
 /**
  * Per-scenario runner options derived from tags. `@cancel` scenarios run with a

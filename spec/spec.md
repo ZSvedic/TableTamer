@@ -1,8 +1,8 @@
-# TableTamer specs
+# TamedTable specs
 
 - [Writing style](../ops/writing-style.md) — how the docs in this directory are written.
 - [Data model](data-model.md) — the wire format: spec + patches.
-- [Rationale](rationale.md) — what TableTamer is and why.
+- [Rationale](rationale.md) — what TamedTable is and why.
 
 ## API
 

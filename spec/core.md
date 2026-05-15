@@ -1,6 +1,6 @@
 # Core
 
-Core defines the shared types — `Spec`, `Row`, `Transformation`, `Expr` — and the functions that read CSV files in and write JSONL files out. It doesn't call the LLM, doesn't render anything, and doesn't know about the terminal or the user; every other `@tabletamer/*` package imports from it.
+Core defines the shared types — `Spec`, `Row`, `Transformation`, `Expr` — and the functions that read CSV files in and write JSONL files out. It doesn't call the LLM, doesn't render anything, and doesn't know about the terminal or the user; every other `@tamedtable/*` package imports from it.
 
 The full type model lives in [data-model.md](data-model.md). This doc narrows that model to V1 and describes what the I/O functions actually do.
 

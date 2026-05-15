@@ -2,9 +2,9 @@ import { Given, When, Then } from '@cucumber/cucumber';
 import { strict as assert } from 'node:assert';
 import { access } from 'node:fs/promises';
 import { join, basename } from 'node:path';
-import { readJsonl, type Row } from '@tabletamer/core';
-import { runCli } from '@tabletamer/cli';
-import { TableTamerWorld, SRC_DIR, SPEC_TC_DIR, TEMP_DIR } from './world.ts';
+import { readJsonl, type Row } from '@tamedtable/core';
+import { runCli } from '@tamedtable/cli';
+import { TamedTableWorld, SRC_DIR, SPEC_TC_DIR, TEMP_DIR } from './world.ts';
 
 // A bare name resolves to a committed fixture under spec/test-cases/.
 // A name containing a slash is treated as src/-relative (= cwd when cucumber
@@ -15,41 +15,41 @@ const fixture = (name: string) => (name.includes('/') ? join(SRC_DIR, name) : jo
 // the committed spec/test-cases/ dir. Golden -expected.jsonl files stay fixtures.
 const output = (name: string) => join(TEMP_DIR, basename(name));
 
-Given('{string} is loaded', async function (this: TableTamerWorld, filename: string) {
+Given('{string} is loaded', async function (this: TamedTableWorld, filename: string) {
   this.inputPath = fixture(filename);
   await this.ensureRunner().loadInput(this.inputPath);
 });
 
-Given('the golden output is {string}', function (this: TableTamerWorld, filename: string) {
+Given('the golden output is {string}', function (this: TamedTableWorld, filename: string) {
   this.goldenPath = fixture(filename);
 });
 
-Given('{string} exists', async function (this: TableTamerWorld, filename: string) {
+Given('{string} exists', async function (this: TamedTableWorld, filename: string) {
   await access(fixture(filename));
 });
 
-When('user requests {string}', async function (this: TableTamerWorld, text: string) {
+When('user requests {string}', async function (this: TamedTableWorld, text: string) {
   await this.ensureRunner().request(text);
 });
 
-When('user requests to export as {string}', async function (this: TableTamerWorld, filename: string) {
+When('user requests to export as {string}', async function (this: TamedTableWorld, filename: string) {
   await this.ensureRunner().exportAs(output(filename));
 });
 
-When('user runs {string}', async function (this: TableTamerWorld, command: string) {
+When('user runs {string}', async function (this: TamedTableWorld, command: string) {
   const tokens = command.trim().split(/\s+/);
-  if (tokens[0] !== 'tabletamer') throw new Error(`expected command to start with 'tabletamer', got: ${command}`);
+  if (tokens[0] !== 'tamedtable') throw new Error(`expected command to start with 'tamedtable', got: ${command}`);
   // Redirect a generated --output into temp/ so it never lands in spec/test-cases/.
   const args = tokens.slice(1).map((tok, i, arr) =>
     i > 0 && arr[i - 1] === '--output' ? output(tok) : tok
   );
   const result = await runCli(args);
   if (result.exitCode !== 0) {
-    throw new Error(`tabletamer exited ${result.exitCode}: ${result.stderr}`);
+    throw new Error(`tamedtable exited ${result.exitCode}: ${result.stderr}`);
   }
 });
 
-Then('column {string} matches the golden output', async function (this: TableTamerWorld, column: string) {
+Then('column {string} matches the golden output', async function (this: TamedTableWorld, column: string) {
   const golden = await readJsonl(this.goldenPath!);
   const actual = this.ensureRunner().currentRows();
   assert.equal(actual.length, golden.length, `row count: actual ${actual.length} vs golden ${golden.length}`);
@@ -58,19 +58,19 @@ Then('column {string} matches the golden output', async function (this: TableTam
   }
 });
 
-Then('the table matches the golden output', async function (this: TableTamerWorld) {
+Then('the table matches the golden output', async function (this: TamedTableWorld) {
   const golden = await readJsonl(this.goldenPath!);
   const actual = this.ensureRunner().currentRows();
   assert.deepEqual(actual, golden);
 });
 
-Then('{string} matches the golden output', async function (this: TableTamerWorld, filename: string) {
+Then('{string} matches the golden output', async function (this: TamedTableWorld, filename: string) {
   const golden = await readJsonl(this.goldenPath!);
   const actual = await readJsonl(output(filename));
   assert.deepEqual(actual, golden);
 });
 
-Then('{string} matches the golden output ignoring {string}', async function (this: TableTamerWorld, filename: string, ignoreColumn: string) {
+Then('{string} matches the golden output ignoring {string}', async function (this: TamedTableWorld, filename: string, ignoreColumn: string) {
   const golden = await readJsonl(this.goldenPath!);
   const actual = await readJsonl(output(filename));
   const strip = (rows: Row[]) =>
@@ -82,17 +82,17 @@ Then('{string} matches the golden output ignoring {string}', async function (thi
   assert.deepEqual(strip(actual), strip(golden));
 });
 
-Given('Phone, Country, and DOB are normalized', async function (this: TableTamerWorld) {
+Given('Phone, Country, and DOB are normalized', async function (this: TamedTableWorld) {
   const runner = this.ensureRunner();
   await runner.request('Normalize phone numbers');
   await runner.request('Normalize country names');
   await runner.request('Normalize DOB formats');
 });
 
-Given('duplicates are removed by Email', async function (this: TableTamerWorld) {
+Given('duplicates are removed by Email', async function (this: TamedTableWorld) {
   await this.ensureRunner().request('Remove duplicate rows by Email');
 });
 
-Given('the table is filtered to USA customers', async function (this: TableTamerWorld) {
+Given('the table is filtered to USA customers', async function (this: TamedTableWorld) {
   await this.ensureRunner().request('Show only customers in the USA');
 });

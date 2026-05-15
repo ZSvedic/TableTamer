@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'bun:test';
 import { computePlan, type PlanItem } from './index.ts';
-import type { Spec, Transformation } from '@tabletamer/core';
+import type { Spec, Transformation } from '@tamedtable/core';
 
 const baseSpec = (overrides: Partial<Spec> = {}): Spec => ({
   columns: [{ id: 'A' }, { id: 'B' }, { id: 'C' }],

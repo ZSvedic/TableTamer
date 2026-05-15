@@ -8,7 +8,7 @@ import {
   type Row,
   type Spec,
   type Transformation,
-} from '@tabletamer/core';
+} from '@tamedtable/core';
 import {
   createHeadlessRunner,
   type ChunkUpdate,
@@ -16,7 +16,7 @@ import {
   type HeadlessRunnerOptions,
   type PlanItem,
   type RequestDebugInfo,
-} from '@tabletamer/headless';
+} from '@tamedtable/headless';
 
 export interface CliRunnerOptions extends HeadlessRunnerOptions {
   stdout?: NodeJS.WritableStream;
@@ -39,13 +39,13 @@ export interface RunCliResult {
   stderr: string;
 }
 
-const HELP_TEXT = `tabletamer — natural-language ETL for CSV files
+const HELP_TEXT = `tamedtable — natural-language ETL for CSV files
 
 Usage:
-  tabletamer <input.csv>                          Start the interactive REPL.
-  tabletamer execute <flow> --output <out.jsonl>  Replay a saved .flow against a CSV (no LLM call).
+  tamedtable <input.csv>                          Start the interactive REPL.
+  tamedtable execute <flow> --output <out.jsonl>  Replay a saved .flow against a CSV (no LLM call).
                                                   --input <csv> overrides flow.source.
-  tabletamer --help, -h                           Show this message.
+  tamedtable --help, -h                           Show this message.
 
 REPL:
   <natural-language request>   e.g. "normalize country names"
@@ -58,12 +58,12 @@ REPL:
 
 Environment (full table in README.md):
   ANTHROPIC_API_KEY        required (loaded from .env if missing or empty)
-  TABLETAMER_MODEL         default claude-sonnet-4-6   patch turn
-  TABLETAMER_CELL_MODEL    default claude-sonnet-4-5   per-cell turn
-  TABLETAMER_BATCH_SIZE    default 20                  rows per LLM request
-  TABLETAMER_CHUNK_SIZE    default 5                   concurrent requests
-  TABLETAMER_RPM           default 40                  per-process rate cap
-  TABLETAMER_DEBUG         unset                       print per-turn debug block on failure
+  TAMEDTABLE_MODEL         default claude-sonnet-4-6   patch turn
+  TAMEDTABLE_CELL_MODEL    default claude-sonnet-4-5   per-cell turn
+  TAMEDTABLE_BATCH_SIZE    default 20                  rows per LLM request
+  TAMEDTABLE_CHUNK_SIZE    default 5                   concurrent requests
+  TAMEDTABLE_RPM           default 40                  per-process rate cap
+  TAMEDTABLE_DEBUG         unset                       print per-turn debug block on failure
 
 Exit codes (execute mode):
   0  success                3  CSV / transformation error
@@ -127,7 +127,7 @@ function userFacingMessage(message: string): string {
 
 function renderError(err: Error, stdout: NodeJS.WritableStream): void {
   stdout.write(`error: ${userFacingMessage(err.message)}\n`);
-  if (!process.env.TABLETAMER_DEBUG) return;
+  if (!process.env.TAMEDTABLE_DEBUG) return;
   const dbg = (err as Error & { debug?: RequestDebugInfo }).debug;
   if (!dbg) return;
   const useColor = Boolean((stdout as { isTTY?: boolean }).isTTY);
@@ -138,7 +138,7 @@ function renderError(err: Error, stdout: NodeJS.WritableStream): void {
     lines.push(`  → outcome: ${t.outcome || 'unknown'}`);
     if (t.sentBack) lines.push(`  → sent back: ${trunc(t.sentBack, 120)}`);
   });
-  lines.push('(unset TABLETAMER_DEBUG to hide this block)');
+  lines.push('(unset TAMEDTABLE_DEBUG to hide this block)');
   const MAX = 20;
   const out = lines.length > MAX ? [...lines.slice(0, MAX - 1), `… (+${lines.length - MAX + 1} more lines)`] : lines;
   const wrap = (s: string) => `    [debug] ${s}`;
@@ -286,9 +286,9 @@ export async function runCli(argv: string[], opts: CliRunnerOptions = {}): Promi
     (opts.stdout ?? process.stdout).write(HELP_TEXT);
     return { exitCode: 0, stderr: '' };
   }
-  if (argv.length === 0) return fail(1, 'tabletamer: REPL mode requires a CSV path. Try --help for usage.');
+  if (argv.length === 0) return fail(1, 'tamedtable: REPL mode requires a CSV path. Try --help for usage.');
   if (argv[0] === 'execute') return runExecute(argv.slice(1), opts, stderr);
-  if (argv[0]?.startsWith('-')) return fail(1, `tabletamer: unrecognized option ${argv[0]} (try --help)`);
+  if (argv[0]?.startsWith('-')) return fail(1, `tamedtable: unrecognized option ${argv[0]} (try --help)`);
   return runRepl(argv, opts, stderr);
 }
 
@@ -310,38 +310,38 @@ function parseExecuteFlags(rest: string[]): { flow?: string; input?: string; out
 async function runExecute(rest: string[], opts: CliRunnerOptions, stderr: string[]): Promise<RunCliResult> {
   const fail = makeFail(stderr);
   const flags = parseExecuteFlags(rest);
-  if (flags.err) return fail(1, `tabletamer execute: ${flags.err}`);
-  if (!flags.output) return fail(1, 'tabletamer execute: --output is required');
+  if (flags.err) return fail(1, `tamedtable execute: ${flags.err}`);
+  if (!flags.output) return fail(1, 'tamedtable execute: --output is required');
 
   const flowPath = await resolveFile(flags.flow!);
-  if (!flowPath) return fail(2, `tabletamer execute: cannot read ${flags.flow}`);
+  if (!flowPath) return fail(2, `tamedtable execute: cannot read ${flags.flow}`);
   const flowDir = path.dirname(flowPath);
 
   let flow: { version?: number; source?: string; spec?: unknown };
   try {
     flow = JSON.parse(await readFile(flowPath, 'utf8'));
   } catch (e) {
-    return fail(2, `tabletamer execute: ${flowPath}: invalid JSON: ${(e as Error).message}`);
+    return fail(2, `tamedtable execute: ${flowPath}: invalid JSON: ${(e as Error).message}`);
   }
-  if (flow.version !== 1) return fail(2, `tabletamer execute: ${flowPath}: version must be 1 (got ${flow.version ?? 'undefined'})`);
+  if (flow.version !== 1) return fail(2, `tamedtable execute: ${flowPath}: version must be 1 (got ${flow.version ?? 'undefined'})`);
 
   let spec: Spec;
   try {
     spec = validateSpec(flow.spec);
   } catch (e) {
-    return fail(2, `tabletamer execute: ${flowPath}: ${(e as Error).message}`);
+    return fail(2, `tamedtable execute: ${flowPath}: ${(e as Error).message}`);
   }
 
   const csvCandidate = flags.input ?? flow.source;
-  if (!csvCandidate) return fail(1, 'tabletamer execute: no input CSV (no --input and flow has no source)');
+  if (!csvCandidate) return fail(1, 'tamedtable execute: no input CSV (no --input and flow has no source)');
   const abs = (p: string) => (path.isAbsolute(p) ? p : path.join(flowDir, p));
   const csvPath = abs(csvCandidate);
   const outputPath = abs(flags.output);
 
   const runner = createHeadlessRunner(opts);
-  try { await runner.loadInput(csvPath); } catch (e) { return fail(3, `tabletamer execute: ${(e as Error).message}`); }
-  try { await runner.setSpec(spec); }      catch (e) { return fail(3, `tabletamer execute: ${(e as Error).message}`); }
-  try { await runner.exportAs(outputPath); } catch (e) { return fail(4, `tabletamer execute: ${(e as Error).message}`); }
+  try { await runner.loadInput(csvPath); } catch (e) { return fail(3, `tamedtable execute: ${(e as Error).message}`); }
+  try { await runner.setSpec(spec); }      catch (e) { return fail(3, `tamedtable execute: ${(e as Error).message}`); }
+  try { await runner.exportAs(outputPath); } catch (e) { return fail(4, `tamedtable execute: ${(e as Error).message}`); }
   return { exitCode: 0, stderr: stderr.join('\n') };
 }
 
@@ -362,7 +362,7 @@ async function runRepl(argv: string[], opts: CliRunnerOptions, stderr: string[])
   try {
     await runner.loadInput(argv[0]!);
   } catch (e) {
-    stderr.push(`tabletamer: ${(e as Error).message}`);
+    stderr.push(`tamedtable: ${(e as Error).message}`);
     return { exitCode: 3, stderr: stderr.join('\n') };
   }
   let activeRequest: AbortController | null = null;

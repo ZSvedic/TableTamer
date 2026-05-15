@@ -1,4 +1,4 @@
-# TableTamer app
+# TamedTable app (formerly TableTamer)
 
 ## Name
 - There is poker sw, but it seems abandoned: 

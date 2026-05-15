@@ -27,7 +27,7 @@ Feature: Data normalization of customer records
 
     @web
     Scenario: Load CSV via Open File dialog
-      Given the TableTamer web app
+      Given the TamedTable web app
       When user says "Load CSV file"
       Then display Open File dialog
       When user selects "datanorm-input.csv"
@@ -45,5 +45,5 @@ Feature: Data normalization of customer records
     Scenario: Execute saved flow from command line
       Given "datanorm.flow" exists
       And the golden output is "datanorm-expected.jsonl"
-      When user runs "tabletamer execute datanorm.flow --input datanorm-input.csv --output datanorm-output.jsonl"
+      When user runs "tamedtable execute datanorm.flow --input datanorm-input.csv --output datanorm-output.jsonl"
       Then "datanorm-output.jsonl" matches the golden output ignoring "Notes"

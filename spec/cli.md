@@ -1,14 +1,14 @@
 # CLI
 
-The CLI is two things on top of headless: an interactive REPL where the user types natural-language requests, and a `tabletamer execute <flow>` command that re-runs a saved spec against a CSV. Both print ASCII tables to stdout and pass every real decision — what the spec looks like, what a transformation does, what counts as valid — down to the headless runner.
+The CLI is two things on top of headless: an interactive REPL where the user types natural-language requests, and a `tamedtable execute <flow>` command that re-runs a saved spec against a CSV. Both print ASCII tables to stdout and pass every real decision — what the spec looks like, what a transformation does, what counts as valid — down to the headless runner.
 
 Per [phase-1-pre-spec.md Q1](../ops/phases/phase-1-pre-spec.md), the REPL prints a fresh view each turn and never uses terminal control codes. Think `sqlite3` or `jq`, not vim.
 
 ## Interactive example
 
 ```console
-$ tabletamer datanorm-input.csv
-TableTamer — datanorm-input.csv (3 columns, 20 rows)
+$ tamedtable datanorm-input.csv
+TamedTable — datanorm-input.csv (3 columns, 20 rows)
  Email                | Phone           | Country
  alice@example.com    | 555-123-4567    | usa
  bob@example.com      | +44 20 7946     | United Kingdom
@@ -28,12 +28,12 @@ running … row 2: Phone "+44 20 7946" → "+442079460958"
 
 Every line the user types is a natural-language request. The REPL hands it to `runner.request` and reprints the table when the request finishes. Long LLM transformations print a few sample row changes as chunks come back.
 
-The REPL accepts five slash commands. `/help` prints the usage screen inline. `/undo` pops the last transformation and replays the rest against the source — no LLM call, instant. `/save <out.jsonl>` writes the current rows to a JSONL file (cwd-relative; same `.jsonl`-only rule as `exportAs`). `/save-flow <out.flow>` writes the current spec as a replayable JSON document — `source` is recorded as a path relative to the flow file's own directory, so `tabletamer execute <flow>` from any cwd resolves the CSV correctly. `/exit` leaves the REPL; `exit` works as a no-slash alias since it's the most common command. Ctrl-C cancels a running request; pressed again while idle, it closes the REPL.
+The REPL accepts five slash commands. `/help` prints the usage screen inline. `/undo` pops the last transformation and replays the rest against the source — no LLM call, instant. `/save <out.jsonl>` writes the current rows to a JSONL file (cwd-relative; same `.jsonl`-only rule as `exportAs`). `/save-flow <out.flow>` writes the current spec as a replayable JSON document — `source` is recorded as a path relative to the flow file's own directory, so `tamedtable execute <flow>` from any cwd resolves the CSV correctly. `/exit` leaves the REPL; `exit` works as a no-slash alias since it's the most common command. Ctrl-C cancels a running request; pressed again while idle, it closes the REPL.
 
 ## Batch example
 
 ```console
-$ tabletamer execute datanorm.flow \
+$ tamedtable execute datanorm.flow \
     --input datanorm-input.csv \
     --output datanorm-output.jsonl
 $ echo $?

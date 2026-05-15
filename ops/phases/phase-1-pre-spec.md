@@ -36,7 +36,7 @@ Questions:
     A: Gherkin scenarios first, API spec derived from them, code last.  
     TDD/BDD/ATDD all converge on outside-in: capture user-visible behavior before committing to an API surface, because behavior is stable while APIs aren't.  
     `@headless` step definitions naturally become an executable API contract — writing them surfaces design questions concretely, so Gherkin and API spec co-evolve in tight cycles for that tier.  
-    For TableTamer, [data-model.md](../../spec/data-model.md) is the draft API contract; next move is to enumerate top use cases as Gherkin (Q5–Q7) and derive HTTP endpoints from what `@headless` steps need to call.
+    For TamedTable, [data-model.md](../../spec/data-model.md) is the draft API contract; next move is to enumerate top use cases as Gherkin (Q5–Q7) and derive HTTP endpoints from what `@headless` steps need to call.
 
  5. Q: What is a list of top 10 ETL use cases for individual users?  
     How to create test cases for them?  
@@ -60,7 +60,7 @@ Questions:
     **Acceptance criteria:** all `@headless` and `@cli` scenarios pass across [datanorm.feature](../../spec/test-cases/datanorm.feature), [dedupe.feature](../../spec/test-cases/dedupe.feature), [filter.feature](../../spec/test-cases/filter.feature) — ~20 of the 29 test runs.  
     **Web app deferred:** the 9 `@web` runs stay tagged for forward-compat but aren't expected to pass until V2-web (consistent with the CLI-first plan in [rationale.md](../../spec/rationale.md)).  
     **Out of scope for V1:** the 7 V2 use cases, web app, DuckDB, voice input, multi-user, cloud sync, telemetry.  
-    **Two CLI modes:** interactive REPL (default) + `tabletamer execute <flow>` batch subcommand.
+    **Two CLI modes:** interactive REPL (default) + `tamedtable execute <flow>` batch subcommand.
 
  8. Q: Which data model should be used, that can be reused between headless/CLI/web?  
 
@@ -91,8 +91,8 @@ Questions:
     What are the pros and cons of each?  
 
     A: Write from scratch on top of the Vercel AI SDK (Q2). Vercel AI SDK already provides ~60% of a harness (`generateText`/`streamText` + tool use + provider abstraction + retries + streaming).  
-    TableTamer-specific 40% — REPL loop, `apply_spec_patch` tool, spec→query→row pipeline, ASCII renderer, chunked `llm-map` dispatcher returning `AsyncIterable<Update>` with `AbortSignal` plumbed through (live progress + cancel), error feedback loop — totals ~400–500 LOC for V1.  
-    **Why not fork SWE-agent:** Python (Q2 chose TS), bash+file-edit domain (TableTamer is JSON spec patches), accumulates full chat history (data-model.md:62 demands stateless ~1KB/turn), sandboxed code execution (not needed). Fork yields ~10% reusable, ~90% to strip — more work than from-scratch.  
+    TamedTable-specific 40% — REPL loop, `apply_spec_patch` tool, spec→query→row pipeline, ASCII renderer, chunked `llm-map` dispatcher returning `AsyncIterable<Update>` with `AbortSignal` plumbed through (live progress + cancel), error feedback loop — totals ~400–500 LOC for V1.  
+    **Why not fork SWE-agent:** Python (Q2 chose TS), bash+file-edit domain (TamedTable is JSON spec patches), accumulates full chat history (data-model.md:62 demands stateless ~1KB/turn), sandboxed code execution (not needed). Fork yields ~10% reusable, ~90% to strip — more work than from-scratch.  
     **Stateless token-budget angle:** "no history accumulation" must be the default; writing from scratch makes that easy, while adapting an existing harness fights its accumulation model.
 
 12. Q: Which tabular UI library should be used for the web app?  

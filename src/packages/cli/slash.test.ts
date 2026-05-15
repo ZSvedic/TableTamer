@@ -4,7 +4,7 @@ import { readFile, unlink, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createCliRunner, handleSlashCommand, type CliRunner } from './index.ts';
-import { loadEnv, readJsonl, validateSpec } from '@tabletamer/core';
+import { loadEnv, readJsonl, validateSpec } from '@tamedtable/core';
 
 // This file lives at src/packages/cli/slash.test.ts.
 const REPO_ROOT = join(import.meta.dirname, '../../..');
@@ -30,7 +30,7 @@ async function loadedHarness(csv = tcFixture('dedupe-input.csv')): Promise<Harne
   return h;
 }
 
-const tmpPath = (suffix: string) => join(tmpdir(), `tabletamer-${process.pid}-${Date.now()}.${suffix}`);
+const tmpPath = (suffix: string) => join(tmpdir(), `tamedtable-${process.pid}-${Date.now()}.${suffix}`);
 
 beforeAll(() => { loadEnv(); });
 

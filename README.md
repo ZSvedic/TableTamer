@@ -1,4 +1,4 @@
-# TableTamer
+# TamedTable
 
 A CLI ETL tool you drive with natural language. Load a CSV, type *"normalize phone numbers"* or *"drop duplicate emails,"* and the LLM rewrites a small JSON spec that the runtime replays against the data. The full motivation is in [spec/rationale.md](spec/rationale.md); the wire-protocol idea — keeping per-turn token cost constant regardless of table size — is in [spec/data-model.md](spec/data-model.md).
 
@@ -9,7 +9,7 @@ V1 ships a terminal CLI and a headless library. A web UI is V2.
 Organized by **lifecycle**, not by file type:
 
 ```
-TableTamer/                  root holds only README.md, LICENSE, .gitignore
+TamedTable/                  root holds only README.md, LICENSE, .gitignore
 ├── ops/                     how the project is built; never deployed
 │   ├── prompts/             reusable phase-runner prompt templates
 │   ├── phases/              per-phase backlogs + the Q1–Q15 decision record
@@ -45,12 +45,12 @@ Optional env vars and defaults if you omit them:
 
 | Var | Default | What it does |
 |---|---|---|
-| `TABLETAMER_MODEL` | `claude-sonnet-4-6` | Model that writes the spec patch each turn. |
-| `TABLETAMER_CELL_MODEL` | `claude-sonnet-4-5` | Model that fills in per-row LLM cells. Override with `claude-haiku-4-5` for cheaper/faster runs at some cost in per-cell fidelity. |
-| `TABLETAMER_RPM` | `40` | Per-process request-per-minute cap. The Anthropic org-wide ceiling is 50. |
-| `TABLETAMER_BATCH_SIZE` | `20` | Rows packed into a single LLM request. The model replies with a JSON array; on a parse failure the runner falls back to per-row calls for that batch. Set to `1` to disable batching. |
-| `TABLETAMER_CHUNK_SIZE` | `5` | LLM requests that fire concurrently. Orthogonal to batch size — total parallel rows = batch × chunk. |
-| `TABLETAMER_DEBUG` | unset | When set, the REPL prints a per-turn debug block after a failed request (indented, dimmed, capped at 20 lines). |
+| `TAMEDTABLE_MODEL` | `claude-sonnet-4-6` | Model that writes the spec patch each turn. |
+| `TAMEDTABLE_CELL_MODEL` | `claude-sonnet-4-5` | Model that fills in per-row LLM cells. Override with `claude-haiku-4-5` for cheaper/faster runs at some cost in per-cell fidelity. |
+| `TAMEDTABLE_RPM` | `40` | Per-process request-per-minute cap. The Anthropic org-wide ceiling is 50. |
+| `TAMEDTABLE_BATCH_SIZE` | `20` | Rows packed into a single LLM request. The model replies with a JSON array; on a parse failure the runner falls back to per-row calls for that batch. Set to `1` to disable batching. |
+| `TAMEDTABLE_CHUNK_SIZE` | `5` | LLM requests that fire concurrently. Orthogonal to batch size — total parallel rows = batch × chunk. |
+| `TAMEDTABLE_DEBUG` | unset | When set, the REPL prints a per-turn debug block after a failed request (indented, dimmed, capped at 20 lines). |
 
 ## Run the CLI
 
@@ -107,7 +107,7 @@ bun x tsc --noEmit && echo "passed"                           # fast type-only c
 bun test                                                      # bun unit tests only
 ```
 
-The `headless` profile binds `createHeadlessRunner` from `@tabletamer/headless`; the `cli` profile binds `createCliRunner` / `runCli` from `@tabletamer/cli`. Both cover [datanorm](spec/test-cases/datanorm.feature), [dedupe](spec/test-cases/dedupe.feature), [filter](spec/test-cases/filter.feature), and [cancelation](spec/test-cases/cancelation.feature); the `cli` profile also covers [cli-flags](spec/test-cases/cli-flags.feature) and [repl-commands](spec/test-cases/repl-commands.feature).
+The `headless` profile binds `createHeadlessRunner` from `@tamedtable/headless`; the `cli` profile binds `createCliRunner` / `runCli` from `@tamedtable/cli`. Both cover [datanorm](spec/test-cases/datanorm.feature), [dedupe](spec/test-cases/dedupe.feature), [filter](spec/test-cases/filter.feature), and [cancelation](spec/test-cases/cancelation.feature); the `cli` profile also covers [cli-flags](spec/test-cases/cli-flags.feature) and [repl-commands](spec/test-cases/repl-commands.feature).
 
 ## Known limitations
 

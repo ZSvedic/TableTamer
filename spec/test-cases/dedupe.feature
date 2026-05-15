@@ -23,5 +23,5 @@ Feature: Deduplicate customer records
     Scenario: Execute saved flow from command line
       Given "dedupe.flow" exists
       And the golden output is "dedupe-expected.jsonl"
-      When user runs "tabletamer execute dedupe.flow --input dedupe-input.csv --output dedupe-output.jsonl"
+      When user runs "tamedtable execute dedupe.flow --input dedupe-input.csv --output dedupe-output.jsonl"
       Then "dedupe-output.jsonl" matches the golden output

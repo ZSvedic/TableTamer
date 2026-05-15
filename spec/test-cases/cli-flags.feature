@@ -5,7 +5,7 @@ Feature: CLI invocation flags
 
   @cli @offline
   Scenario: --help prints the usage screen and exits 0
-    When user invokes "tabletamer --help"
+    When user invokes "tamedtable --help"
     Then exit code is 0
     And stdout contains "Usage:"
     And stdout contains "/help"
@@ -14,24 +14,24 @@ Feature: CLI invocation flags
 
   @cli @offline
   Scenario: -h is an alias for --help
-    When user invokes "tabletamer -h"
+    When user invokes "tamedtable -h"
     Then exit code is 0
     And stdout contains "Usage:"
 
   @cli @offline
   Scenario: bare "help" subcommand also prints usage
-    When user invokes "tabletamer help"
+    When user invokes "tamedtable help"
     Then exit code is 0
     And stdout contains "Usage:"
 
   @cli @offline
   Scenario: No arguments hints at --help
-    When user invokes "tabletamer"
+    When user invokes "tamedtable"
     Then exit code is 1
     And stderr contains "Try --help"
 
   @cli @offline
   Scenario: Unknown option points to --help
-    When user invokes "tabletamer --not-a-flag"
+    When user invokes "tamedtable --not-a-flag"
     Then exit code is 1
     And stderr contains "--help"

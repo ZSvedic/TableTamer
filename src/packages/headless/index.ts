@@ -9,7 +9,7 @@ import {
   type Row,
   type Spec,
   type Transformation,
-} from '@tabletamer/core';
+} from '@tamedtable/core';
 
 export type ChunkUpdate = {
   transformationIndex: number;
@@ -61,16 +61,16 @@ export interface HeadlessRunner {
   exportAs(path: string): Promise<void>;
 }
 
-const DEFAULT_MODEL = process.env.TABLETAMER_MODEL ?? 'claude-sonnet-4-6';
-const DEFAULT_CELL_MODEL = process.env.TABLETAMER_CELL_MODEL ?? 'claude-sonnet-4-5';
+const DEFAULT_MODEL = process.env.TAMEDTABLE_MODEL ?? 'claude-sonnet-4-6';
+const DEFAULT_CELL_MODEL = process.env.TAMEDTABLE_CELL_MODEL ?? 'claude-sonnet-4-5';
 const DEFAULT_MAX_RETRIES = 6;
-const DEFAULT_RPM = Number(process.env.TABLETAMER_RPM ?? 40);
-const DEFAULT_CHUNK_SIZE = Number(process.env.TABLETAMER_CHUNK_SIZE ?? 5);
-const DEFAULT_BATCH_SIZE = Number(process.env.TABLETAMER_BATCH_SIZE ?? 20);
+const DEFAULT_RPM = Number(process.env.TAMEDTABLE_RPM ?? 40);
+const DEFAULT_CHUNK_SIZE = Number(process.env.TAMEDTABLE_CHUNK_SIZE ?? 5);
+const DEFAULT_BATCH_SIZE = Number(process.env.TAMEDTABLE_BATCH_SIZE ?? 20);
 
 const BATCH_SYSTEM_PROMPT = `You will process several independent micro-tasks. Apply each task's instructions exactly to its own content. Return ONLY a JSON array of entries, one per task, in the same order as the tasks — no prose, no explanation, no markdown fences. Each entry is either a string (the per-task result) or the JSON literal null (when the per-task instructions say to reply null).`;
 
-const SYSTEM_PROMPT = `You are TableTamer, an LLM that edits a JSON Spec describing transformations over a tabular dataset. The user describes a transformation in natural language; you reply by calling the apply_spec_patch tool with a list of RFC 6902 JSON Patch operations that mutate the current spec into the desired one. Do not call the tool more than once per turn. Do not reply with text — always use the tool.
+const SYSTEM_PROMPT = `You are TamedTable, an LLM that edits a JSON Spec describing transformations over a tabular dataset. The user describes a transformation in natural language; you reply by calling the apply_spec_patch tool with a list of RFC 6902 JSON Patch operations that mutate the current spec into the desired one. Do not call the tool more than once per turn. Do not reply with text — always use the tool.
 
 Key rules:
 - New requests are additive. Use {op:"add", path:"/transformations/-", value:<Transformation>} to append. Never remove or replace a prior transformation unless the user explicitly says to undo or replace it.
@@ -295,7 +295,7 @@ class HeadlessRunnerImpl implements HeadlessRunner {
   constructor(opts: HeadlessRunnerOptions = {}) {
     this.opts = opts;
     if (opts.rpm) rateLimiter.setLimit(opts.rpm);
-    if (process.env.TABLETAMER_RPM) rateLimiter.setLimit(Number(process.env.TABLETAMER_RPM));
+    if (process.env.TAMEDTABLE_RPM) rateLimiter.setLimit(Number(process.env.TAMEDTABLE_RPM));
   }
 
   private requireLoaded(): void {

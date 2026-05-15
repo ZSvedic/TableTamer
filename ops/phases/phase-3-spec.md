@@ -12,7 +12,7 @@ Prerequisites: Q1–Q15 in [phase-1-pre-spec.md](phase-1-pre-spec.md), the wire 
 
 3. **`spec/headless.md`** — `createHeadlessRunner`: harness components per Q11, system-prompt structure per Q14, chunk/cancel semantics per Q10, error-recovery loop per Q9.
 
-4. **`spec/cli.md`** — `createCliRunner` (REPL per Q1) and `runCli` (the `tabletamer execute <flow>` subcommand per Q7/Q15). Includes `.flow` file format and exit codes.
+4. **`spec/cli.md`** — `createCliRunner` (REPL per Q1) and `runCli` (the `tamedtable execute <flow>` subcommand per Q7/Q15). Includes `.flow` file format and exit codes.
 
 ## Definition of done
 - Every symbol referenced in [test-cases/step-defs/](../../src/tests/) has a defining section in one of the four sub-docs.

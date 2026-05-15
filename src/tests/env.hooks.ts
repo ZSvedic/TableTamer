@@ -1,5 +1,5 @@
 import { BeforeAll } from '@cucumber/cucumber';
-import { loadEnv } from '@tabletamer/core';
+import { loadEnv } from '@tamedtable/core';
 
 BeforeAll(function () {
   loadEnv();

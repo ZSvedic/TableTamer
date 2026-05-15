@@ -1,8 +1,8 @@
 import { Before, type ITestCaseHookParameter } from '@cucumber/cucumber';
-import { createCliRunner } from '@tabletamer/cli';
-import { TableTamerWorld, runnerOptsFor } from './world.ts';
+import { createCliRunner } from '@tamedtable/cli';
+import { TamedTableWorld, runnerOptsFor } from './world.ts';
 
-Before({ tags: '@cli' }, function (this: TableTamerWorld, scenario: ITestCaseHookParameter) {
+Before({ tags: '@cli' }, function (this: TamedTableWorld, scenario: ITestCaseHookParameter) {
   if (this.surface !== 'cli') return;
   this.runnerKind = 'cli';
   const opts = runnerOptsFor(scenario);

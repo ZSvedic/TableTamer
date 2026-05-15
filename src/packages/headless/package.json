@@ -1,5 +1,5 @@
 {
-  "name": "@tabletamer/headless",
+  "name": "@tamedtable/headless",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.74",
-    "@tabletamer/core": "workspace:*",
+    "@tamedtable/core": "workspace:*",
     "ai": "^6.0.174",
     "fast-json-patch": "^3.1.1"
   }

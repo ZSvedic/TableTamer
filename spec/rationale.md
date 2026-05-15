@@ -1,4 +1,4 @@
-# TableTamer app
+# TamedTable app
 
 ## Problem
 ETL ([Extract-Transform-Load](https://en.wikipedia.org/wiki/Extract,_transform,_load)) software is commonly used in enterprises and sciences to process large datasets. 
@@ -35,13 +35,13 @@ The problem is that, since users are not programmers, it is difficult for them t
 - Manage dependencies and security.
 
 ## Proposed solution
-An open-source TableTamer web app that combines elements of:
+An open-source TamedTable web app that combines elements of:
 - Google Sheets: tabular editor. 
 - Claude Code: sidebar chat that calls tools.
 - Claude Design: user comments on the table are resolved in the background, and the code is hidden.
-More specifically, TableTamer is a web agent [harness](https://martinfowler.com/articles/harness-engineering.html) for data ETL use cases. 
+More specifically, TamedTable is a web agent [harness](https://martinfowler.com/articles/harness-engineering.html) for data ETL use cases. 
 No programming knowledge is needed, as data is displayed on screen and transformations are specified in natural language (either by typing or by voice).
-In the background, TableTamer handles technical tasks like:
+In the background, TamedTable handles technical tasks like:
 - Keeping a history of all transformations.
 - Undo/redo.
 - Version control.
