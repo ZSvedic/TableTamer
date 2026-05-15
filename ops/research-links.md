@@ -1,6 +1,16 @@
-# TamedTable app (formerly TableTamer)
+## TamedTable name
+- No software product, GitHub repo, or npm package found with this exact name.
+- Adjacent / unrelated hits:
+  - Table Tamer (poker session manager — already noted below): https://automaticpoker.com/table-management-software/
+  - TAME — Test Automation Made Easy (unrelated): https://www.tametest.com/
+  - Tame (event/video platform, unrelated): https://www.capterra.com/p/180832/Tame/
+  - `@thetrg/tamed` on npm (unrelated, not a table package): https://www.npmjs.com/package/@thetrg/tamed
+- Pros: past-participle adjective reads unambiguously as "tables that have been brought under control" — no imperative-verb confusion; singular form fits SaaS naming patterns (Airtable, Smartsheet, DataFrame); inherits the "tame" intuition you already settled on.
+- Cons: still uses the crowded "Table*" prefix; "tamed" can carry a faintly negative shade in other contexts ("a tamed version" = watered-down), though it doesn't bite in the messy-data domain.
 
-## Name
+## Alternative names
+
+### Formerly TableTamer
 - There is poker sw, but it seems abandoned: 
   https://www.reddit.com/r/poker/comments/piv3d4/table_tamer_dead/ 
   https://upswingpoker.com/poker-tools-software/table-tamer/
@@ -11,8 +21,6 @@
     https://tanstack.com/table/latest
     https://github.com/tanstack/table
   - TanStack Query: https://tanstack.com/query/latest
-
-## Alternative names
 
 ### TameTables
 - No software product or GitHub/npm package found with this exact name.
@@ -31,16 +39,6 @@
   - port-whisperer — CLI listing local ports: https://github.com/LarsenCundric/port-whisperer
 - Pros: evokes a clear personality (patient, skilled handler of messy data), distinct from TableTimer, noun-shaped.
 - Cons: "X-whisperer" is a tired naming trope at this point; longer (15 chars); sits in a category where several adjacent "whisperer" tools already exist.
-
-### TamedTable
-- No software product, GitHub repo, or npm package found with this exact name.
-- Adjacent / unrelated hits:
-  - Table Tamer (poker session manager — already noted above): https://automaticpoker.com/table-management-software/
-  - TAME — Test Automation Made Easy (unrelated): https://www.tametest.com/
-  - Tame (event/video platform, unrelated): https://www.capterra.com/p/180832/Tame/
-  - `@thetrg/tamed` on npm (unrelated, not a table package): https://www.npmjs.com/package/@thetrg/tamed
-- Pros: past-participle adjective reads unambiguously as "tables that have been brought under control" — no imperative-verb confusion; singular form fits SaaS naming patterns (Airtable, Smartsheet, DataFrame); inherits the "tame" intuition you already settled on.
-- Cons: still uses the crowded "Table*" prefix; "tamed" can carry a faintly negative shade in other contexts ("a tamed version" = watered-down), though it doesn't bite in the messy-data domain.
 
 ### SheetShepherd
 - No software product, GitHub repo, or npm package found with this exact name.
