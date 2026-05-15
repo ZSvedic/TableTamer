@@ -8,8 +8,8 @@ Feature: CLI invocation flags
     When user invokes "tamedtable --help"
     Then exit code is 0
     And stdout contains "Usage:"
-    And stdout contains "/help"
-    And stdout contains "/undo"
+    And stdout contains ":help"
+    And stdout contains ":undo"
     And stdout contains "ANTHROPIC_API_KEY"
 
   @cli @offline

@@ -63,7 +63,7 @@ Optional env vars and defaults if you omit them:
 
 ## Run the CLI
 
-Interactive REPL — load a CSV, then type natural-language requests. Inside the session: `/help` lists commands, `/undo` reverts the last transformation, `/save <out.jsonl>` writes current rows to disk, `/save-flow <out.flow>` saves the current spec for later replay, `exit` leaves.
+Interactive REPL — load a CSV, then type natural-language requests. REPL commands use a `:` prefix (`/` is intercepted by Claude Code and other CLI agents): `:help` lists commands, `:undo` reverts the last patch, `:save <out.jsonl>` writes current rows to disk, `:save-flow <out.flow>` saves the current spec for later replay, `:exit` (or bare `exit`) leaves.
 
 ```
 bun src/packages/cli/index.ts spec/test-cases/datanorm-input.csv
@@ -103,7 +103,7 @@ bun run test          # both cucumber profiles (headless then cli) over the V1 f
 bun run test:offline  # bun unit tests + the @offline cucumber subset (no LLM, no API key)
 ```
 
-`bun run test` runs `--profile headless` then `--profile cli`; the final exit code is from the `cli` profile. The `@offline` subset (CLI flags + REPL slash commands) and the bun unit tests need no API key.
+`bun run test` runs `--profile headless` then `--profile cli`; the final exit code is from the `cli` profile. The `@offline` subset (CLI flags + REPL commands) and the bun unit tests need no API key.
 
 Narrower runs, layered on top of any of the above:
 
@@ -129,25 +129,17 @@ claude
 > @ops/prompts/prompt-woz.md
 ```
 
-That sets the WoZ persona. Now type CLI-shaped input (`normalize phone numbers`, `execute datanorm.flow …`, `>/help`) and WoZ replies as TamedTable would. Two modes auto-select from what you type:
+That loads WoZ. Every message you type is independently classified by its first character — no persistent persona switching:
 
-- **deterministic** — escaped REPL slash commands (`>/help`, `>/undo`, `>/save out.jsonl`), `execute <flow>`, and `--flag` CLI invocations: byte-for-byte reproduction from `behavior.md`.
-- **patch** — natural-language transformation requests: emits the JSON Patch the spec-editor LLM should produce per `prompt-app-edit.md`. For `{llm:…}` columns, WoZ appends 3–5 synthesized sample cell values (plausible, not golden). Prefix `patch only:` to suppress synthesis.
+| Prefix | Persona | Use for |
+|---|---|---|
+| `> <note>` | SCRIBE | Spec edits: `> change the wording of :undo to …`, `> pin the page size at 20`. One-shot — the next message without a `>` prefix returns to WoZ automatically. |
+| `:cmd ...` | WoZ — deterministic | Simulated TamedTable REPL commands: `:help`, `:load file.csv`, `:undo`, `:save out.jsonl`, `:save-flow out.flow`, `:exit`. (The REPL uses `:` instead of `/` because `/` is intercepted by Claude Code and other CLI agents.) |
+| anything else | WoZ — default | NL transformation requests (`normalize phone numbers`, `drop duplicate emails`) emit the JSON Patch the spec-editor LLM would produce per `prompt-app-edit.md`. For `{llm:…}` columns, WoZ appends 3–5 synthesized sample cell values (plausible, not golden) — prefix `patch only:` to suppress. `execute <flow>` / `--flag` invocations reproduce CLI behavior byte-for-byte. |
 
-Three help layers — Claude Code intercepts bare `/`, so each layer has its own trigger:
+Visual: WoZ output appears in fenced code blocks (terminal-shaped — that's the simulated TamedTable output). SCRIBE responses appear as markdown blockquotes (every line prefixed with `> `, mirroring your input prefix).
 
-| Trigger | Whose help |
-|---|---|
-| `/help` | Claude Code itself. Owned by the harness; never reaches WoZ. |
-| `?` (or `?help`) | WoZ / SCRIBE persona help. |
-| `>/help` | TamedTable's REPL `/help`, simulated byte-for-byte. |
-
-The `>` prefix dodges Claude Code's slash interceptor — note that a leading space (`/help` → ` /help`) does *not* dodge it, so use `>/` with no space. Treat `>` as the gate marker; WoZ simulates everything after it as if typed at TamedTable's own `>` prompt.
-
-Switch personas in-session without restarting:
-
-- `scribe: <note>` — hand off to SCRIBE with `<note>` as the spec edit to capture. SCRIBE edits `spec/behavior.md` (almost always), `spec/code-contract.md` (only when the API surface changes), or `spec/prompt-app-edit.md` (prompt tuning). It never touches `src/`, `ops/phases/`, or `spec/test-cases/*.feature`.
-- After a SCRIBE edit, ask to simulate again and SCRIBE switches back to WoZ.
+SCRIBE edits `spec/behavior.md` (almost always), `spec/code-contract.md` (only when the API surface changes), or `spec/prompt-app-edit.md` (prompt tuning). It never touches `src/`, `ops/phases/`, or `spec/test-cases/*.feature`.
 
 For V2 web-UI questions WoZ produces a Claude artifact or writes a sketch to `temp/` rather than refusing.
 

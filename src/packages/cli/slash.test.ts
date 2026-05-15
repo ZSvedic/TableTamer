@@ -38,16 +38,16 @@ describe('handleSlashCommand', () => {
   it('returns "exit" for the exit alias', async () => {
     const h = makeHarness();
     expect(await handleSlashCommand('exit', h.runner, h.stream)).toBe('exit');
-    expect(await handleSlashCommand('/exit', h.runner, h.stream)).toBe('exit');
+    expect(await handleSlashCommand(':exit', h.runner, h.stream)).toBe('exit');
   });
 
-  it('returns "handled" for /help and writes a usage screen', async () => {
+  it('returns "handled" for :help and writes a usage screen', async () => {
     const h = makeHarness();
-    expect(await handleSlashCommand('/help', h.runner, h.stream)).toBe('handled');
+    expect(await handleSlashCommand(':help', h.runner, h.stream)).toBe('handled');
     const out = h.text();
     expect(out).toContain('Usage:');
-    expect(out).toContain('/help');
-    expect(out).toContain('/undo');
+    expect(out).toContain(':help');
+    expect(out).toContain(':undo');
     expect(out).toContain('exit');
   });
 
@@ -58,24 +58,24 @@ describe('handleSlashCommand', () => {
     expect(await handleSlashCommand('undo this thing', h.runner, h.stream)).toBe('unhandled');
   });
 
-  it('on /undo with no transformations writes "nothing to undo."', async () => {
+  it('on :undo with no transformations writes "nothing to undo."', async () => {
     const h = await loadedHarness();
-    expect(await handleSlashCommand('/undo', h.runner, h.stream)).toBe('handled');
+    expect(await handleSlashCommand(':undo', h.runner, h.stream)).toBe('handled');
     expect(h.text()).toContain('nothing to undo.');
     expect(h.runner.currentSpec().transformations.length).toBe(0);
   });
 
-  it('on /save without a path prints usage', async () => {
+  it('on :save without a path prints usage', async () => {
     const h = await loadedHarness();
-    expect(await handleSlashCommand('/save', h.runner, h.stream)).toBe('handled');
-    expect(h.text()).toContain('/save: missing path');
+    expect(await handleSlashCommand(':save', h.runner, h.stream)).toBe('handled');
+    expect(h.text()).toContain(':save: missing path');
   });
 
-  it('on /save <path> writes current rows as JSONL', async () => {
+  it('on :save <path> writes current rows as JSONL', async () => {
     const h = await loadedHarness();
     const out = tmpPath('jsonl');
     try {
-      expect(await handleSlashCommand(`/save ${out}`, h.runner, h.stream)).toBe('handled');
+      expect(await handleSlashCommand(`:save ${out}`, h.runner, h.stream)).toBe('handled');
       expect(h.text()).toContain(`saved ${h.runner.currentRows().length} rows to ${out}`);
       await stat(out);
       const written = await readJsonl(out);
@@ -85,27 +85,27 @@ describe('handleSlashCommand', () => {
     }
   });
 
-  it('on /save with a non-jsonl path surfaces the error', async () => {
+  it('on :save with a non-jsonl path surfaces the error', async () => {
     const h = await loadedHarness();
     const out = tmpPath('csv');
-    expect(await handleSlashCommand(`/save ${out}`, h.runner, h.stream)).toBe('handled');
+    expect(await handleSlashCommand(`:save ${out}`, h.runner, h.stream)).toBe('handled');
     expect(h.text()).toContain('error:');
     await unlink(out).catch(() => {});
   });
 
-  it('on /save-flow without a path prints usage', async () => {
+  it('on :save-flow without a path prints usage', async () => {
     const h = await loadedHarness();
-    expect(await handleSlashCommand('/save-flow', h.runner, h.stream)).toBe('handled');
-    expect(h.text()).toContain('/save-flow: missing path');
+    expect(await handleSlashCommand(':save-flow', h.runner, h.stream)).toBe('handled');
+    expect(h.text()).toContain(':save-flow: missing path');
   });
 
-  it('on /save-flow writes a flow whose source is relative to the flow file dir', async () => {
+  it('on :save-flow writes a flow whose source is relative to the flow file dir', async () => {
     const h = await loadedHarness();
     const flowFixture = JSON.parse(await readFile(tcFixture('dedupe.flow'), 'utf8'));
     await h.runner.setSpec(validateSpec(flowFixture.spec));
     const outFlow = tmpPath('flow');
     try {
-      expect(await handleSlashCommand(`/save-flow ${outFlow}`, h.runner, h.stream)).toBe('handled');
+      expect(await handleSlashCommand(`:save-flow ${outFlow}`, h.runner, h.stream)).toBe('handled');
       expect(h.text()).toContain('saved flow');
       const saved = JSON.parse(await readFile(outFlow, 'utf8'));
       expect(saved.version).toBe(1);
@@ -118,7 +118,7 @@ describe('handleSlashCommand', () => {
     }
   });
 
-  it('on /save-flow followed by execute round-trips the same rows', async () => {
+  it('on :save-flow followed by execute round-trips the same rows', async () => {
     const h = await loadedHarness();
     const flowFixture = JSON.parse(await readFile(tcFixture('dedupe.flow'), 'utf8'));
     await h.runner.setSpec(validateSpec(flowFixture.spec));
@@ -126,7 +126,7 @@ describe('handleSlashCommand', () => {
     const outFlow = join(TEMP, `repl-save-flow-roundtrip-${process.pid}.flow`);
     const outJsonl = join(TEMP, `repl-save-flow-roundtrip-${process.pid}.jsonl`);
     try {
-      await handleSlashCommand(`/save-flow ${outFlow}`, h.runner, h.stream);
+      await handleSlashCommand(`:save-flow ${outFlow}`, h.runner, h.stream);
       const { runCli } = await import('./index.ts');
       const result = await runCli(['execute', outFlow, '--output', outJsonl.split('/').pop()!]);
       expect(result.exitCode).toBe(0);
@@ -141,13 +141,13 @@ describe('handleSlashCommand', () => {
     }
   });
 
-  it('on /undo after a JS-only setSpec pops the last transformation and reprints', async () => {
+  it('on :undo after a JS-only setSpec pops the last transformation and reprints', async () => {
     const h = await loadedHarness();
     const flow = JSON.parse(await readFile(tcFixture('dedupe.flow'), 'utf8'));
     await h.runner.setSpec(validateSpec(flow.spec));
     const beforeLen = h.runner.currentSpec().transformations.length;
     expect(beforeLen).toBeGreaterThan(0);
-    expect(await handleSlashCommand('/undo', h.runner, h.stream)).toBe('handled');
+    expect(await handleSlashCommand(':undo', h.runner, h.stream)).toBe('handled');
     const out = h.text();
     expect(out).toContain('undid:');
     expect(out).toContain('filter rows where');

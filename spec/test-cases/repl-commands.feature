@@ -1,18 +1,19 @@
-Feature: REPL slash commands
+Feature: REPL commands
 
-  The three commands the REPL handles locally without any LLM round-trip:
-  /help echoes usage, /undo pops the last transformation, exit closes the loop.
+  The commands the REPL handles locally without any LLM round-trip
+  (`:` prefix because `/` is intercepted by Claude Code and other CLI agents):
+  :help echoes usage, :undo pops the last patch, exit closes the loop.
 
   @cli @offline
-  Scenario: /help echoes the usage screen in-session
+  Scenario: :help echoes the usage screen in-session
     When user enters the REPL with "dedupe-input.csv" and types:
       """
-      /help
+      :help
       exit
       """
     Then REPL exit code is 0
     And REPL stdout contains "Usage:"
-    And REPL stdout contains "/undo"
+    And REPL stdout contains ":undo"
 
   @cli @offline
   Scenario: exit closes the REPL with code 0
@@ -23,38 +24,38 @@ Feature: REPL slash commands
     Then REPL exit code is 0
 
   @cli @offline
-  Scenario: /exit closes the REPL with code 0
+  Scenario: :exit closes the REPL with code 0
     When user enters the REPL with "dedupe-input.csv" and types:
       """
-      /exit
+      :exit
       """
     Then REPL exit code is 0
 
   @cli @offline
-  Scenario: /undo on a freshly loaded CSV says nothing to undo
+  Scenario: :undo on a freshly loaded CSV says nothing to undo
     When user enters the REPL with "dedupe-input.csv" and types:
       """
-      /undo
+      :undo
       exit
       """
     Then REPL exit code is 0
     And REPL stdout contains "nothing to undo."
 
   @cli @offline
-  Scenario: /save without a path prints usage
+  Scenario: :save without a path prints usage
     When user enters the REPL with "dedupe-input.csv" and types:
       """
-      /save
+      :save
       exit
       """
     Then REPL exit code is 0
-    And REPL stdout contains "/save: missing path"
+    And REPL stdout contains ":save: missing path"
 
   @cli @offline
-  Scenario: /save writes current rows to a JSONL file
+  Scenario: :save writes current rows to a JSONL file
     When user enters the REPL with "dedupe-input.csv" and types:
       """
-      /save ../temp/repl-save-output.jsonl
+      :save ../temp/repl-save-output.jsonl
       exit
       """
     Then REPL exit code is 0
@@ -62,20 +63,20 @@ Feature: REPL slash commands
     And "../temp/repl-save-output.jsonl" exists
 
   @cli @offline
-  Scenario: /save-flow without a path prints usage
+  Scenario: :save-flow without a path prints usage
     When user enters the REPL with "dedupe-input.csv" and types:
       """
-      /save-flow
+      :save-flow
       exit
       """
     Then REPL exit code is 0
-    And REPL stdout contains "/save-flow: missing path"
+    And REPL stdout contains ":save-flow: missing path"
 
   @cli @offline
-  Scenario: /save-flow writes a replayable flow file
+  Scenario: :save-flow writes a replayable flow file
     When user enters the REPL with "dedupe-input.csv" and types:
       """
-      /save-flow ../temp/repl-save-flow-output.flow
+      :save-flow ../temp/repl-save-flow-output.flow
       exit
       """
     Then REPL exit code is 0

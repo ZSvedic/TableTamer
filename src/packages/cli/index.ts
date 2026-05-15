@@ -49,11 +49,11 @@ Usage:
 
 REPL:
   <natural-language request>   e.g. "normalize country names"
-  /help                        Show this message.
-  /undo                        Pop the last transformation and replay (no LLM call).
-  /save <out.jsonl>            Write current rows to a JSONL file (cwd-relative).
-  /save-flow <out.flow>        Write the current spec as a replayable .flow file.
-  exit                         Leave the REPL (/exit also accepted).
+  :help                        Show this message.
+  :undo                        Pop the last transformation and replay (no LLM call).
+  :save <out.jsonl>            Write current rows to a JSONL file (cwd-relative).
+  :save-flow <out.flow>        Write the current spec as a replayable .flow file.
+  exit                         Leave the REPL (:exit also accepted).
   Ctrl-C                       Cancel a running request, or exit when idle.
 
 Environment (full table in README.md):
@@ -213,9 +213,9 @@ async function runWithErrorRender(stdout: NodeJS.WritableStream, fn: () => Promi
 }
 
 const SLASH: Record<string, SlashHandler> = {
-  '/help'(_arg, _r, stdout) { stdout.write(HELP_TEXT); },
+  ':help'(_arg, _r, stdout) { stdout.write(HELP_TEXT); },
 
-  async '/undo'(_arg, runner, stdout) {
+  async ':undo'(_arg, runner, stdout) {
     const spec = runner.currentSpec();
     if (spec.transformations.length === 0) { stdout.write('nothing to undo.\n'); return; }
     const popped = spec.transformations[spec.transformations.length - 1] as Transformation;
@@ -226,18 +226,18 @@ const SLASH: Record<string, SlashHandler> = {
     });
   },
 
-  async '/save'(arg, runner, stdout) {
-    if (!arg) { stdout.write('/save: missing path. Usage: /save <output.jsonl>\n'); return; }
+  async ':save'(arg, runner, stdout) {
+    if (!arg) { stdout.write(':save: missing path. Usage: :save <output.jsonl>\n'); return; }
     await runWithErrorRender(stdout, async () => {
       await runner.exportAs(arg);
       stdout.write(`saved ${runner.currentRows().length} rows to ${arg}\n`);
     });
   },
 
-  async '/save-flow'(arg, runner, stdout) {
-    if (!arg) { stdout.write('/save-flow: missing path. Usage: /save-flow <out.flow>\n'); return; }
+  async ':save-flow'(arg, runner, stdout) {
+    if (!arg) { stdout.write(':save-flow: missing path. Usage: :save-flow <out.flow>\n'); return; }
     const spec = runner.currentSpec();
-    if (!spec.table) { stdout.write('/save-flow: spec has no source CSV table; cannot write a flow.\n'); return; }
+    if (!spec.table) { stdout.write(':save-flow: spec has no source CSV table; cannot write a flow.\n'); return; }
     await runWithErrorRender(stdout, async () => {
       const flowDir = path.dirname(path.resolve(arg));
       const absSource = path.resolve(spec.table!);
@@ -251,7 +251,7 @@ const SLASH: Record<string, SlashHandler> = {
 
 /**
  * Handle REPL slash commands and bare-word aliases. Returns:
- *  - `'exit'` for `exit` / `/exit` (caller should break out of the loop).
+ *  - `'exit'` for `exit` / `:exit` (caller should break out of the loop).
  *  - `'handled'` for any recognized command (caller reprints prompt and continues).
  *  - `'unhandled'` for any other input (caller passes it through to the LLM).
  * Exported so tests can drive it directly without standing up the readline loop.
@@ -261,7 +261,7 @@ export async function handleSlashCommand(
   runner: CliRunner,
   stdout: NodeJS.WritableStream
 ): Promise<SlashCommandAction> {
-  if (text === 'exit' || text === '/exit') return 'exit';
+  if (text === 'exit' || text === ':exit') return 'exit';
   const { cmd, arg } = splitCmd(text);
   const handler = SLASH[cmd];
   if (!handler) return 'unhandled';
@@ -369,7 +369,7 @@ async function runRepl(argv: string[], opts: CliRunnerOptions, stderr: string[])
   const rl = readline.createInterface({ input: stdin as NodeJS.ReadableStream, output: stdout as NodeJS.WritableStream, terminal: false });
   const onSigint = () => { activeRequest ? activeRequest.abort() : rl.close(); };
   process.on('SIGINT', onSigint);
-  stdout.write("Commands: /help, /undo, /save, /save-flow, exit. Ctrl-C cancels a running request (or exits when idle).\n");
+  stdout.write("Commands: :help, :undo, :save, :save-flow, exit. Ctrl-C cancels a running request (or exits when idle).\n");
   try {
     stdout.write('> ');
     for await (const line of rl) {

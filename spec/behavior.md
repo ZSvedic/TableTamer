@@ -145,9 +145,9 @@ that re-runs a saved spec against a CSV.
 ### REPL
 
 The REPL prints a fresh ASCII table after every event that changes the
-visible table state: a successful natural-language request, `/load`, or
-`/undo`. Slash commands that don't change table state (`/help`, `/save`,
-`/save-flow`, `/exit`) print only their own output. A failed request
+visible table state: a successful natural-language request, `:load`, or
+`:undo`. REPL commands that don't change table state (`:help`, `:save`,
+`:save-flow`, `:exit`) print only their own output. A failed request
 prints the error and does not reprint the table.
 
 Tables paginate at 10 rows per page (the default page size). When rows
@@ -157,29 +157,31 @@ hidden above the current page, at the bottom when rows are hidden below.
 No terminal control codes — think `sqlite3` or `jq`, not `vim`. Long LLM
 transformations print a few sample row changes per chunk while they run.
 
-Slash commands are handled locally without any LLM round-trip:
+REPL commands use a `:` prefix (chosen over `/` because `/` is intercepted
+by Claude Code and other CLI agents; `:` passes through to the runtime).
+They are handled locally without any LLM round-trip:
 
-- `/help` prints the usage screen inline.
-- `/undo` pops the last applied patch — reversing every transformation
+- `:help` prints the usage screen inline.
+- `:undo` pops the last applied patch — reversing every transformation
   and column change the most recent user turn introduced, as a single
   unit. On an empty history, prints `nothing to undo.`
-- `/load <path>` reads a CSV or JSONL file as the new input source (file
+- `:load <path>` reads a CSV or JSONL file as the new input source (file
   type inferred from extension; only `.csv` and `.jsonl` accepted in V1;
   `<path>` is taken literally — a leading `@` is part of the filename,
   not a Claude-Code-style file reference). Resets transformations,
   filter/sort, and cached LLM cell results just like loading at startup.
-  Missing path prints `/load: missing path`; unknown extension prints
-  `/load: unknown file type`; success prints
+  Missing path prints `:load: missing path`; unknown extension prints
+  `:load: unknown file type`; success prints
   `Loaded <path> (N rows, M cols)` (no column names) followed by the
   table.
-- `/save <path>` writes current rows to a JSONL file (path resolved relative
+- `:save <path>` writes current rows to a JSONL file (path resolved relative
   to the working directory; only `.jsonl` accepted in V1). Missing path
-  prints `/save: missing path`; success prints a `saved` confirmation.
-- `/save-flow <path>` writes the current spec as a replayable JSON document
+  prints `:save: missing path`; success prints a `saved` confirmation.
+- `:save-flow <path>` writes the current spec as a replayable JSON document
   (the source path inside the flow is recorded relative to the flow file's
-  own directory). Missing path prints `/save-flow: missing path`; success
+  own directory). Missing path prints `:save-flow: missing path`; success
   prints `saved flow`.
-- `/exit` and bare `exit` both close the REPL with exit code 0.
+- `:exit` and bare `exit` both close the REPL with exit code 0.
 
 Ctrl-C while a request runs cancels it and rolls back the half-applied
 transformation. Ctrl-C while idle closes the REPL.
