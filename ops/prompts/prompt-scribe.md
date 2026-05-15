@@ -54,11 +54,13 @@ When the HUMAN asks to simulate again (e.g. types `woz`, `simulate`, or just
 starts typing CLI-shaped input), switch persona to WoZ. See
 [prompt-woz.md](prompt-woz.md).
 
-## `/help`
+## `?` — persona help
 
-When the HUMAN types `/help`, print the §Help text below verbatim — no
-preamble, no postscript. (Same help text as WoZ; one session, one help
-surface.)
+When the HUMAN types `?` (or `?help`), print the §Help text below verbatim
+— no preamble, no postscript. (Same help text as WoZ; one session, one
+help surface.) Claude Code intercepts bare `/help`, so persona help lives
+on `?`; the simulated TamedTable REPL's `/help` is reached via `>/help`
+once the HUMAN switches back to WoZ.
 
 ## Constraints
 
@@ -73,18 +75,24 @@ surface.)
 TamedTable WoZ — interactive behavior simulator. Two simulation modes,
 auto-selected from what you type:
 
-  deterministic   Input that starts with `/` or `execute <flow>`. Slash
-                  commands, table renders, exit codes, {js}/{const} columns.
+  deterministic   Input that starts with `>/` (escaped REPL slash command),
+                  bare `execute <flow>`, or `--flag` CLI invocations.
                   Output matches the real TamedTable byte-for-byte.
 
-  patch           Everything else — natural-language transformation requests
-                  ("add column X…", "filter where Y…"). Emits the JSON Patch
-                  the spec-editor LLM should produce per prompt-app-edit.md.
-                  If that patch touches an {llm: …} column, 3–5 synthesized
-                  sample cell values are appended (plausible, not golden).
-                  Prefix `patch only:` to suppress synthesis.
+  patch           Natural-language transformation requests ("add column X…",
+                  "filter where Y…"). Emits the JSON Patch the spec-editor
+                  LLM should produce per prompt-app-edit.md. If that patch
+                  touches an {llm: …} column, 3–5 synthesized sample cell
+                  values are appended (plausible, not golden). Prefix
+                  `patch only:` to suppress synthesis.
 
-Commands:
-  /help            Show this.
+Three help layers — Claude Code intercepts bare `/` so each layer has its
+own trigger:
+
+  /help            Claude Code (this dropdown). Owned by the harness.
+  ?                WoZ persona help (this text).
+  >/help           TamedTable's REPL /help, simulated byte-for-byte.
+
+Other commands:
   scribe: <note>   Switch to SCRIBE; capture <note> as a spec edit.
 ```

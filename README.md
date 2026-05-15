@@ -129,10 +129,20 @@ claude
 > @ops/prompts/prompt-woz.md
 ```
 
-That sets the WoZ persona. Now type CLI-shaped input (`/help`, `> normalize phone numbers`, `execute datanorm.flow …`) and WoZ replies as TamedTable would. Two modes auto-select from what you type:
+That sets the WoZ persona. Now type CLI-shaped input (`normalize phone numbers`, `execute datanorm.flow …`, `>/help`) and WoZ replies as TamedTable would. Two modes auto-select from what you type:
 
-- **deterministic** — slash commands, table renders, exit codes, `{js}` predicates: byte-for-byte reproduction from `behavior.md`.
+- **deterministic** — escaped REPL slash commands (`>/help`, `>/undo`, `>/save out.jsonl`), `execute <flow>`, and `--flag` CLI invocations: byte-for-byte reproduction from `behavior.md`.
 - **patch** — natural-language transformation requests: emits the JSON Patch the spec-editor LLM should produce per `prompt-app-edit.md`. For `{llm:…}` columns, WoZ appends 3–5 synthesized sample cell values (plausible, not golden). Prefix `patch only:` to suppress synthesis.
+
+Three help layers — Claude Code intercepts bare `/`, so each layer has its own trigger:
+
+| Trigger | Whose help |
+|---|---|
+| `/help` | Claude Code itself. Owned by the harness; never reaches WoZ. |
+| `?` (or `?help`) | WoZ / SCRIBE persona help. |
+| `>/help` | TamedTable's REPL `/help`, simulated byte-for-byte. |
+
+The `>` prefix dodges Claude Code's slash interceptor — note that a leading space (`/help` → ` /help`) does *not* dodge it, so use `>/` with no space. Treat `>` as the gate marker; WoZ simulates everything after it as if typed at TamedTable's own `>` prompt.
 
 Switch personas in-session without restarting:
 
