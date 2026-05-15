@@ -1,5 +1,11 @@
 # Phase 4 — Implementation (V1 CLI)
 
+> Frozen planning record. References to the four V1 sub-docs (`core.md`,
+> `runner.md`, `headless.md`, `cli.md`) and `data-model.md` below were live
+> when this phase ran; phase 5 consolidated them into
+> [spec/behavior.md](../../spec/behavior.md) and
+> [spec/code-contract.md](../../spec/code-contract.md).
+
 Goal: implement the V1 spec set so every `@headless` and `@cli` scenario across [datanorm.feature](../../spec/test-cases/datanorm.feature), [dedupe.feature](../../spec/test-cases/dedupe.feature), and [filter.feature](../../spec/test-cases/filter.feature) passes. Phase 2 left the imports red; phase 3 wrote the contract; phase 4 fills in the code.
 
 Prerequisites: the spec hub at [spec.md](../../spec/spec.md) and the four V1 sub-docs ([core.md](../../spec/core.md), [runner.md](../../spec/runner.md), [headless.md](../../spec/headless.md), [cli.md](../../spec/cli.md)); the wire model in [data-model.md](../../spec/data-model.md); the Q1–Q15 decisions in [phase-1-pre-spec.md](phase-1-pre-spec.md); the conventions in [conventions.md](../conventions.md). Run `bun run test:red` first to confirm the current red state and `bun install` once to refresh [bun.lock](../../src/bun.lock) after the fast-json-patch dep move.

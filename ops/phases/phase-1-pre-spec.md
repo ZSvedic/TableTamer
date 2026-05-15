@@ -1,3 +1,8 @@
+> Frozen planning record. Links to `spec/data-model.md` below were live when
+> this phase ran; phase 5 consolidated that content into
+> [spec/behavior.md → Data model](../../spec/behavior.md#data-model) and
+> [spec/code-contract.md → Data model](../../spec/code-contract.md#data-model).
+
 ## Open Questions
 
 The plan is to first develop a CLI app in order to use less tokens and to iterate faster. 

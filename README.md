@@ -1,6 +1,6 @@
 # TamedTable
 
-A CLI ETL tool you drive with natural language. Load a CSV, type *"normalize phone numbers"* or *"drop duplicate emails,"* and the LLM rewrites a small JSON spec that the runtime replays against the data. The full motivation is in [spec/rationale.md](spec/rationale.md); the wire-protocol idea — keeping per-turn token cost constant regardless of table size — is in [spec/data-model.md](spec/data-model.md).
+A CLI ETL tool you drive with natural language. Load a CSV, type *"normalize phone numbers"* or *"drop duplicate emails,"* and the LLM rewrites a small JSON spec that the runtime replays against the data. The full motivation is in [spec/rationale.md](spec/rationale.md); the wire-protocol idea — keeping per-turn token cost constant regardless of table size — is in [spec/behavior.md](spec/behavior.md#data-model).
 
 V1 ships a terminal CLI and a headless library. A web UI is V2.
 
@@ -82,7 +82,7 @@ bun src/packages/cli/index.ts execute spec/test-cases/datanorm.flow \
     --output temp/out.jsonl
 ```
 
-Exit codes are documented in [spec/cli.md](spec/cli.md).
+Exit codes are documented in [spec/code-contract.md](spec/code-contract.md#cli).
 
 ## Run the tests
 
@@ -112,5 +112,5 @@ The `headless` profile binds `createHeadlessRunner` from `@tamedtable/headless`;
 ## Known limitations
 
 - **Per-org rate limit dominates wall-clock.** A full test run is 7–9 minutes; most of that is the 40 RPM throttle waiting out the 50 RPM org ceiling, not LLM latency. Two back-to-back runs risk hitting the cap on retries.
-- **Golden-file fragility on LLM cells.** Some `datanorm` scenarios assert byte equality against a frozen JSONL golden. Sonnet and Haiku produce semantically-equivalent but not byte-identical outputs for ambiguous inputs (e.g. phone numbers without a country code), and the model's own minor revisions can shift the answer over time. Mismatches on LLM-driven cells aren't necessarily regressions — see the *Determinism* section in [spec/headless.md](spec/headless.md).
+- **Golden-file fragility on LLM cells.** Some `datanorm` scenarios assert byte equality against a frozen JSONL golden. Sonnet and Haiku produce semantically-equivalent but not byte-identical outputs for ambiguous inputs (e.g. phone numbers without a country code), and the model's own minor revisions can shift the answer over time. Mismatches on LLM-driven cells aren't necessarily regressions — see the determinism note at the end of [spec/behavior.md → Headless](spec/behavior.md#headless).
 - **CSV in, JSONL out.** Other formats are V2.

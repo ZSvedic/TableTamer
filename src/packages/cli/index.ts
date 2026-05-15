@@ -70,7 +70,7 @@ Exit codes (execute mode):
   1  bad invocation         4  output write error
   2  bad .flow file
 
-Docs: README.md, spec/cli.md.
+Docs: README.md, spec/behavior.md.
 `;
 
 // ── Pure formatting helpers ────────────────────────────────────────────────

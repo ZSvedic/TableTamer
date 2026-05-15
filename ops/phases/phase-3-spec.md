@@ -1,5 +1,13 @@
 # Phase 3 — Spec documents
 
+> Frozen planning record. The four per-surface docs produced by this phase
+> (`core.md`, `runner.md`, `headless.md`, `cli.md`) and the wire-model doc
+> (`data-model.md`) were consolidated in phase 5 into
+> [spec/behavior.md](../../spec/behavior.md) and
+> [spec/code-contract.md](../../spec/code-contract.md). Path references in
+> this doc point to files that no longer exist; the planning narrative is
+> preserved for the record.
+
 Goal: write V1 specification documents under [spec/](../../spec/). No code in this phase — phase 4 implements against these specs. The symbols phase 2 surfaced (types, I/O, runner factories) get described as semantics, not as TypeScript signatures.
 
 Prerequisites: Q1–Q15 in [phase-1-pre-spec.md](phase-1-pre-spec.md), the wire model in [data-model.md](../../spec/data-model.md), the step-def usage in [test-cases/step-defs/](../../src/tests/) as the API-surface inventory, and [writing-style.md](../writing-style.md) as the voice and structure guide. [spec.md](../../spec/spec.md) is the index that will link to the four sub-docs once written.
